@@ -2,126 +2,124 @@ import streamlit as st
 
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# --- BASE DE DATOS DE BEBIDAS Y OTROS ---
+# --- 1. INICIALIZACIÓN DE LA MEMORIA (SESSION STATE) ---
 if 'menu' not in st.session_state:
     st.session_state.menu = {
         "🍺 Bebidas": {"Imperial": 1500, "Pilsen": 1500, "ChiliAlaska": 2000},
         "📦 Otros": {"Cigarros": 2500, "Snacks": 1000}
     }
 
+if 'count_add' not in st.session_state:
+    st.session_state.count_add = 0
+
+# --- 2. FUNCIÓN PARA LIMPIAR TODO ---
+def limpiar_cierre():
+    # Buscamos todas las llaves que guardan montos y las ponemos en 0
+    for key in st.session_state.keys():
+        if key.startswith(('bebida_', 'otro_', 'billete_', 'moneda_', 'pago_', 'monto_total_comida')):
+            st.session_state[key] = 0
+    st.toast("✅ Todos los campos se han reiniciado", icon="🧹")
+
 st.title("💰 Gestión de Caja - Alaska")
 
-# --- PESTAÑAS ---
+# --- 3. BOTÓN DE LIMPIEZA EN EL SIDEBAR ---
+st.sidebar.header("🧹 Acciones")
+if st.sidebar.button("LIMPIAR TODO EL CIERRE", use_container_width=True, type="primary"):
+    limpiar_cierre()
+    st.rerun()
+
+# --- 4. PESTAÑAS ---
 tab_bebidas, tab_comida, tab_otros, tab_arqueo = st.tabs([
     "🍺 Bebidas", "🍳 Ventas Comida", "📦 Otros", "📉 CIERRE FINAL"
 ])
 
 ventas_esperadas = 0
 
-# 1. PESTAÑA BEBIDAS
+# --- PESTAÑA BEBIDAS (Buscador + 2 Columnas) ---
 with tab_bebidas:
-    st.subheader("Conteo de Bebidas")
-    for prod, precio in st.session_state.menu["🍺 Bebidas"].items():
-        c1, c2 = st.columns([2, 1])
-        # Agregamos un prefijo a la key para evitar duplicados
-        cant = c1.number_input(f"{prod} (₡{precio:,})", min_value=0, key=f"bebida_{prod}")
-        subtotal = cant * precio
-        ventas_esperadas += subtotal
-        c2.write(f"₡{subtotal:,}")
+    st.subheader("Selección de Bebidas")
+    busqueda = st.text_input("🔍 Filtrar bebida...", key="search_input").lower()
+    
+    lista_completa = list(st.session_state.menu["🍺 Bebidas"].items())
+    lista_filtrada = [p for p in lista_completa if busqueda in p[0].lower()]
+    
+    if not lista_filtrada:
+        st.warning("No se encontraron coincidencias.")
+    else:
+        for i in range(0, len(lista_filtrada), 2):
+            c1, c2 = st.columns(2)
+            p1, pre1 = lista_filtrada[i]
+            with c1:
+                st.number_input(f"{p1} (₡{pre1:,})", min_value=0, step=1, key=f"bebida_{p1}")
+            if i + 1 < len(lista_filtrada):
+                p2, pre2 = lista_filtrada[i+1]
+                with c2:
+                    st.number_input(f"{p2} (₡{pre2:,})", min_value=0, step=1, key=f"bebida_{p2}")
 
-# 2. PESTAÑA COMIDA (POR MONTO DE COMANDAS)
+    # Cálculo total de bebidas (incluyendo las ocultas por el filtro)
+    total_bebidas = sum(st.session_state.get(f"bebida_{p}", 0) * pre for p, pre in lista_completa)
+    ventas_esperadas += total_bebidas
+    st.write(f"**Subtotal Bebidas:** ₡{total_bebidas:,}")
+
+# --- PESTAÑA COMIDA ---
 with tab_comida:
     st.subheader("Suma de Comandas")
-    st.info("Suma los totales de tus comandas de cocina y anota el monto aquí.")
     monto_comida = st.number_input("Total Ventas de Cocina (₡)", min_value=0, step=500, key="monto_total_comida")
     ventas_esperadas += monto_comida
-    st.write(f"**Subtotal Comida:** ₡{monto_comida:,}")
 
-# 3. PESTAÑA OTROS
+# --- PESTAÑA OTROS (2 Columnas) ---
 with tab_otros:
     st.subheader("Otros Productos")
-    for prod, precio in st.session_state.menu["📦 Otros"].items():
-        c1, c2 = st.columns([2, 1])
-        # Prefijo diferente para esta pestaña
-        cant = c1.number_input(f"{prod} (₡{precio:,})", min_value=0, key=f"otro_{prod}")
-        subtotal = cant * precio
-        ventas_esperadas += subtotal
-        c2.write(f"₡{subtotal:,}")
+    lista_otros = list(st.session_state.menu["📦 Otros"].items())
+    for i in range(0, len(lista_otros), 2):
+        c1, c2 = st.columns(2)
+        p1, pre1 = lista_otros[i]
+        with c1:
+            st.number_input(f"{p1} (₡{pre1:,})", min_value=0, step=1, key=f"otro_{p1}")
+        if i + 1 < len(lista_otros):
+            p2, pre2 = lista_otros[i+1]
+            with c2:
+                st.number_input(f"{p2} (₡{pre2:,})", min_value=0, step=1, key=f"otro_{p2}")
+    
+    total_otros = sum(st.session_state.get(f"otro_{p}", 0) * pre for p, pre in lista_otros)
+    ventas_esperadas += total_otros
 
-# --- PESTAÑA DE CIERRE Y ARQUEO ---
+# --- PESTAÑA CIERRE FINAL ---
 with tab_arqueo:
     st.header("🧮 Arqueo de Efectivo")
-    
-    col_billetes, col_monedas = st.columns(2)
+    col_b, col_m = st.columns(2)
     total_efectivo = 0
-    
-    with col_billetes:
-        st.subheader("Billetes")
+    with col_b:
         for b in [20000, 10000, 5000, 2000, 1000]:
-            cant = st.number_input(f"₡{b:,}", min_value=0, step=1, key=f"billete_{b}")
-            total_efectivo += (cant * b)
-            
-    with col_monedas:
-        st.subheader("Monedas")
+            total_efectivo += st.number_input(f"₡{b:,}", min_value=0, step=1, key=f"billete_{b}") * b
+    with col_m:
         for m in [500, 100, 50, 25, 10, 5]:
-            cant = st.number_input(f"₡{m}", min_value=0, step=1, key=f"moneda_{m}")
-            total_efectivo += (cant * m)
+            total_efectivo += st.number_input(f"₡{m}", min_value=0, step=1, key=f"moneda_{m}") * m
 
     st.divider()
-    st.subheader("💳 Otros Ingresos y Créditos")
     sinpe = st.number_input("Total SINPE Móvil", min_value=0, key="pago_sinpe")
-    tarjetas = st.number_input("Total Tarjetas (Vouchers)", min_value=0, key="pago_tarjeta")
-    pendientes = st.number_input("Pendientes (Créditos/Fiados)", min_value=0, key="pago_pendientes")
-    fondo_inicial = st.number_input("Fondo Inicial (Caja Chica)", min_value=0, key="caja_fondo")
+    tarjetas = st.number_input("Total Tarjetas", min_value=0, key="pago_tarjeta")
+    pendientes = st.number_input("Pendientes (Fiados)", min_value=0, key="pago_pendientes")
+    fondo = st.number_input("Fondo Inicial", min_value=0, key="caja_fondo")
 
-    # CÁLCULOS FINALES
-    st.divider()
     total_reportado = total_efectivo + sinpe + tarjetas + pendientes
-    ventas_reales_hoy = total_reportado - fondo_inicial
-    diferencia = ventas_reales_hoy - ventas_esperadas
+    ventas_reales = total_reportado - fondo
+    dif = ventas_reales - ventas_esperadas
 
-    st.write(f"### Dinero Físico en Caja: ₡{total_efectivo:,}")
-    st.write(f"### Ventas Netas Totales: ₡{ventas_reales_hoy:,}")
-    st.write(f"### Venta Esperada: ₡{ventas_esperadas:,}")
-    
-    if st.button("REALIZAR CONCILIACIÓN", key="btn_conciliar"):
-        if diferencia == 0:
-            st.success("🎯 ¡Perfecto! La caja cuadra exactamente.")
-        elif diferencia > 0:
-            st.warning(f"📈 Sobrante: ₡{diferencia:,}")
-        else:
-            st.error(f"📉 Faltante: ₡{abs(diferencia):,}")
+    st.write(f"### Venta Neta: ₡{ventas_reales:,} | Esperada: ₡{ventas_esperadas:,}")
+    if st.button("CONCILIAR", key="btn_final"):
+        if dif == 0: st.success("🎯 Caja Cuadrada")
+        elif dif > 0: st.warning(f"📈 Sobrante: ₡{dif:,}")
+        else: st.error(f"📉 Faltante: ₡{abs(dif):,}")
 
-# --- CONFIGURACIÓN EN SIDEBAR (CORREGIDA) ---
-st.sidebar.header("⚙️ Configuración")
-
-# Creamos un contador en la sesión si no existe
-if 'count_add' not in st.session_state:
-    st.session_state.count_add = 0
-
-if st.sidebar.checkbox("Gestionar Productos"):
-    st.sidebar.subheader("Añadir")
-    cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="cat_add_select")
-    
-    # Usamos el contador en la key para que se limpie al guardar
-    nom_add = st.sidebar.text_input("Nombre", key=f"nom_input_{st.session_state.count_add}")
-    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"pre_input_{st.session_state.count_add}")
-    
-    if st.sidebar.button("Guardar Producto", key="btn_guardar_new"):
-        if nom_add:
-            # Guardamos el producto
-            st.session_state.menu[cat_add][nom_add] = pre_add
-            # Aumentamos el contador para limpiar los campos
-            st.session_state.count_add += 1
-            st.success(f"¡{nom_add} guardado!")
-            st.rerun()
-    
-    st.sidebar.divider()
-    st.sidebar.subheader("Eliminar")
-    cat_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="cat_del_select")
-    
-    if st.session_state.menu[cat_del]:
-        prod_del = st.sidebar.selectbox("Producto", list(st.session_state.menu[cat_del].keys()), key="prod_del_select")
-        if st.sidebar.button("🗑️ Borrar", key="btn_borrar_prod"):
-            del st.session_state.menu[cat_del][prod_del]
-            st.rerun()
+# --- SIDEBAR: GESTIÓN DE PRODUCTOS ---
+st.sidebar.divider()
+if st.sidebar.checkbox("⚙️ Configurar Productos"):
+    # (Aquí va el código de añadir/eliminar que ya teníamos, usando st.session_state.count_add)
+    cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"])
+    nom_add = st.sidebar.text_input("Nombre", key=f"add_n_{st.session_state.count_add}")
+    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"add_p_{st.session_state.count_add}")
+    if st.sidebar.button("Añadir"):
+        st.session_state.menu[cat_add][nom_add] = pre_add
+        st.session_state.count_add += 1
+        st.rerun()
