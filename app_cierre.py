@@ -92,21 +92,34 @@ with tab_arqueo:
         else:
             st.error(f"📉 Faltante: ₡{abs(diferencia):,}")
 
-# --- CONFIGURACIÓN EN SIDEBAR ---
+# --- CONFIGURACIÓN EN SIDEBAR (CORREGIDA) ---
 st.sidebar.header("⚙️ Configuración")
+
+# Creamos un contador en la sesión si no existe
+if 'count_add' not in st.session_state:
+    st.session_state.count_add = 0
+
 if st.sidebar.checkbox("Gestionar Productos"):
     st.sidebar.subheader("Añadir")
     cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="cat_add_select")
-    nom_add = st.sidebar.text_input("Nombre", key="nom_add_input")
-    pre_add = st.sidebar.number_input("Precio", min_value=0, key="pre_add_input")
+    
+    # Usamos el contador en la key para que se limpie al guardar
+    nom_add = st.sidebar.text_input("Nombre", key=f"nom_input_{st.session_state.count_add}")
+    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"pre_input_{st.session_state.count_add}")
+    
     if st.sidebar.button("Guardar Producto", key="btn_guardar_new"):
         if nom_add:
+            # Guardamos el producto
             st.session_state.menu[cat_add][nom_add] = pre_add
+            # Aumentamos el contador para limpiar los campos
+            st.session_state.count_add += 1
+            st.success(f"¡{nom_add} guardado!")
             st.rerun()
     
     st.sidebar.divider()
     st.sidebar.subheader("Eliminar")
     cat_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="cat_del_select")
+    
     if st.session_state.menu[cat_del]:
         prod_del = st.sidebar.selectbox("Producto", list(st.session_state.menu[cat_del].keys()), key="prod_del_select")
         if st.sidebar.button("🗑️ Borrar", key="btn_borrar_prod"):
