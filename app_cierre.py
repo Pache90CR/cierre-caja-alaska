@@ -108,7 +108,7 @@ if st.sidebar.checkbox("Gestionar Productos (Bebidas/Otros)"):
     prod_del = st.sidebar.selectbox("Producto", list(st.session_state.menu[cat_del].keys()))
     if st.sidebar.button("🗑️ Eliminar"):
         del st.session_state.menu[cat_del][prod_del]
-        st.rerun()import streamlit as st
+        st.rerun()
 
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
