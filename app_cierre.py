@@ -54,20 +54,22 @@ with tab_arqueo:
             total_efectivo += (cant * m)
 
     st.divider()
-    st.subheader("💳 Otros Ingresos")
+    st.subheader("💳 Otros Ingresos y Créditos")
     sinpe = st.number_input("Total SINPE Móvil", min_value=0)
     tarjetas = st.number_input("Total Tarjetas (Vouchers)", min_value=0)
+    pendientes = st.number_input("Pendientes (Créditos/Fiados del día)", min_value=0, help="Ventas realizadas que aún no se han cobrado.")
     fondo_inicial = st.number_input("Fondo Inicial (Caja Chica)", min_value=0)
 
     # CÁLCULOS FINALES
     st.divider()
-    total_en_mano = total_efectivo + sinpe + tarjetas
-    ventas_reales_hoy = total_en_mano - fondo_inicial
+    # El "Total Reportado" incluye lo que hay en dinero + lo que te deben (pendientes)
+    total_reportado = total_efectivo + sinpe + tarjetas + pendientes
+    ventas_reales_hoy = total_reportado - fondo_inicial
     diferencia = ventas_reales_hoy - ventas_esperadas
 
-    st.write(f"### Dinero Físico Total: ₡{total_efectivo:,}")
-    st.write(f"### Venta Neta del Día: ₡{ventas_reales_hoy:,}")
-    st.write(f"### Venta Esperada: ₡{ventas_esperadas:,}")
+    st.write(f"### Dinero Físico en Caja: ₡{total_efectivo:,}")
+    st.write(f"### Ventas Netas (Incluye Pendientes): ₡{ventas_reales_hoy:,}")
+    st.write(f"### Venta Esperada según Productos: ₡{ventas_esperadas:,}")
     
     if st.button("REALIZAR CONCILIACIÓN"):
         if diferencia == 0:
@@ -77,14 +79,26 @@ with tab_arqueo:
         else:
             st.error(f"📉 Faltante: ₡{abs(diferencia):,}")
 
-# Botón para agregar productos en el sidebar
-st.sidebar.header("Configuración")
-if st.sidebar.checkbox("Agregar Productos"):
+# --- CONFIGURACIÓN EN SIDEBAR ---
+st.sidebar.header("⚙️ Configuración de Menú")
+
+# Opción para Agregar
+if st.sidebar.checkbox("Añadir Producto"):
     st.sidebar.subheader("Nuevo Producto")
-    cat = st.sidebar.selectbox("Categoría", list(st.session_state.menu.keys()))
-    nom = st.sidebar.text_input("Nombre")
-    pre = st.sidebar.number_input("Precio", min_value=0)
-    if st.sidebar.button("Añadir"):
-        if nom:
-            st.session_state.menu[cat][nom] = pre
+    cat_add = st.sidebar.selectbox("Categoría a añadir", list(st.session_state.menu.keys()))
+    nom_add = st.sidebar.text_input("Nombre del producto")
+    pre_add = st.sidebar.number_input("Precio", min_value=0, key="add_price")
+    if st.sidebar.button("Guardar"):
+        if nom_add:
+            st.session_state.menu[cat_add][nom_add] = pre_add
             st.rerun()
+
+# Opción para Eliminar
+if st.sidebar.checkbox("Eliminar Producto"):
+    st.sidebar.subheader("Borrar Producto")
+    cat_del = st.sidebar.selectbox("Categoría del producto", list(st.session_state.menu.keys()))
+    prod_del = st.sidebar.selectbox("Producto a eliminar", list(st.session_state.menu[cat_del].keys()))
+    if st.sidebar.button("🗑️ Confirmar Eliminación"):
+        del st.session_state.menu[cat_del][prod_del]
+        st.sidebar.success(f"Eliminado: {prod_del}")
+        st.rerun()
