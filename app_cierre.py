@@ -1,68 +1,177 @@
 import streamlit as st
 
-st.set_page_config(page_title="POS Alaska", layout="centered")
+st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# --- ESTADO DE LA APP (Para guardar productos nuevos en la sesión) ---
-if 'menu_personalizado' not in st.session_state:
-    st.session_state.menu_personalizado = {
-        "Bebidas": {"Imperial": 1500, "Pilsen": 1500, "ChiliAlaska": 2000},
-        "Comida": {"Hamburguesa": 3500, "Papas Fritas": 2000},
-        "Otros": {"Cigarros": 2500}
+# --- BASE DE DATOS TEMPORAL ---
+if 'menu' not in st.session_state:
+    st.session_state.menu = {
+        "🍺 Bebidas": {"Imperial": 1500, "Pilsen": 1500, "ChiliAlaska": 2000},
+        "🍔 Comida": {"Hamburguesa": 3500, "Papas": 2000},
+        "📦 Otros": {"Cigarros": 2500}
     }
 
-st.title("🇨🇷 Sistema de Ventas - Alaska")
+st.title("💰 Gestión de Caja - Alaska")
 
-# --- SECCIÓN: AGREGAR NUEVOS PRODUCTOS ---
-with st.expander("➕ Agregar nuevo producto al menú"):
-    nueva_cat = st.selectbox("Categoría", ["Bebidas", "Comida", "Otros"])
-    nuevo_nombre = st.text_input("Nombre del producto (ej: Heineken)")
-    nuevo_precio = st.number_input("Precio (Colones)", min_value=0, step=100)
-    
-    if st.button("Guardar en Menú"):
-        if nuevo_nombre:
-            st.session_state.menu_personalizado[nueva_cat][nuevo_nombre] = nuevo_precio
-            st.success(f"{nuevo_nombre} agregado!")
-            st.rerun()
+# --- PESTAÑAS ---
+tab_bebidas, tab_comida, tab_otros, tab_arqueo = st.tabs([
+    "🍺 Bebidas", "🍔 Comida", "📦 Otros", "📉 CIERRE FINAL"
+])
 
-# --- SECCIÓN: REGISTRO DE VENTAS ---
-st.header("📝 Registro de Hoy")
-tab1, tab2, tab3 = st.tabs(["🍺 Bebidas", "🍔 Comida", "📦 Otros"])
+ventas_esperadas = 0
 
-ventas_totales = 0
-
-def mostrar_categoria(categoria, tab_obj):
-    global ventas_totales
-    with tab_obj:
-        for prod, precio in st.session_state.menu_personalizado[categoria].items():
-            col1, col2 = st.columns([2, 1])
-            cant = col1.number_input(f"{prod} (₡{precio:,})", min_value=0, step=1, key=f"v_{prod}")
+# Función para renderizar ventas
+def render_ventas(categoria, tab):
+    global ventas_esperadas
+    with tab:
+        for prod, precio in st.session_state.menu[categoria].items():
+            c1, c2 = st.columns([2, 1])
+            cant = c1.number_input(f"{prod} (₡{precio:,})", min_value=0, key=f"v_{prod}")
             subtotal = cant * precio
-            ventas_totales += subtotal
-            col2.write(f"Sub: ₡{subtotal:,}")
+            ventas_esperadas += subtotal
+            c2.write(f"₡{subtotal:,}")
 
-mostrar_categoria("Bebidas", tab1)
-mostrar_categoria("Comida", tab2)
-mostrar_categoria("Otros", tab3)
+render_ventas("🍺 Bebidas", tab_bebidas)
+render_ventas("🍔 Comida", tab_comida)
+render_ventas("📦 Otros", tab_otros)
 
-st.divider()
-st.metric("VENTA TOTAL ESPERADA", f"₡{ventas_totales:,}")
+# --- PESTAÑA DE CIERRE Y ARQUEO ---
+with tab_arqueo:
+    st.header("🧮 Arqueo de Efectivo")
+    
+    col_billetes, col_monedas = st.columns(2)
+    
+    total_efectivo = 0
+    
+    with col_billetes:
+        st.subheader("Billetes")
+        for b in [20000, 10000, 5000, 2000, 1000]:
+            cant = st.number_input(f"₡{b:,}", min_value=0, step=1, key=f"b_{b}")
+            total_efectivo += (cant * b)
+            
+    with col_monedas:
+        st.subheader("Monedas")
+        for m in [500, 100, 50, 25, 10, 5]:
+            cant = st.number_input(f"₡{m}", min_value=0, step=1, key=f"m_{m}")
+            total_efectivo += (cant * m)
 
-# --- SECCIÓN: EL CUADRE FINAL ---
-st.header("💰 Cuadre de Caja")
-sinpe = st.number_input("Total recibido por SINPE", min_value=0)
-tarjetas = st.number_input("Total Vouchers Tarjeta", min_value=0)
-efectivo_contado = st.number_input("Efectivo total en la gaveta", min_value=0)
-fondo_inicial = st.number_input("Fondo inicial (cambio)", min_value=0)
+    st.divider()
+    
+    st.subheader("💳 Otros Ingresos")
+    sinpe = st.number_input("Total SINPE Móvil", min_value=0)
+    tarjetas = st.number_input("Total Tarjetas (Vouchers)", min_value=0)
+    fondo_inicial = st.number_input("Fondo Inicial (Caja Chica)", min_value=0)
 
-# El dinero real que entró hoy
-dinero_real = (efectivo_contado + sinpe + tarjetas) - fondo_inicial
-diferencia = dinero_real - ventas_totales
+    # CÁLCULOS FINALES
+    st.divider()
+    total_en_mano = total_efectivo + sinpe + tarjetas
+    ventas_reales_hoy = total_en_mano - fondo_inicial
+    diferencia = ventas_reales_hoy - ventas_esperadas
 
-if st.button("CALCULAR CIERRE"):
-    st.subheader(f"Resultado: ₡{dinero_real:,}")
-    if diferencia == 0:
-        st.success("✅ Caja Cuadrada")
-    elif diferencia > 0:
-        st.warning(f"⚠️ Sobrante: ₡{diferencia:,}")
-    else:
-        st.error(f"❌ Faltante: ₡{abs(diferencia):,}")
+    st.write(f"### Dinero Físico Total: ₡{total_efectivo:,}")
+    st.write(f"### Venta Neta (Sin fondo): ₡{ventas_reales_hoy:,}")
+    
+    if st.button("REALIZAR CONCILIACIÓN"):
+        if diferencia == 0:
+            st.success("🎯 ¡Perfecto! La caja cuadra exactamente.")
+        elif diferencia > 0:
+            st.warning(f"📈 Sobrante: ₡{diferencia:,}. Revisa si olvidaste anotar una venta.")
+        else:
+            st.error(f"📉 Faltante: ₡{abs(diferencia):,}. ¡Cuidado!")
+
+    # Botón para agregar productos (ahora al final o en sidebar)
+    if st.sidebar.checkbox("Configuración: Agregar Productos"):
+        st.sidebar.subheader("Nuevo Producto")
+        cat = st.sidebar.selectbox("Categoría", list(st.session_state.menu.keys()))
+        nom = st.sidebar.text_input("Nombre")
+        pre = st.sidebar.number_input("Precio", min_value=0)
+        if st.sidebar.button("Añadir"):
+            st.session_state.menu[cat][nom] = pre
+            st.rerun()import streamlit as st
+
+st.set_page_config(page_title="Cierre Alaska", layout="centered")
+
+# --- BASE DE DATOS TEMPORAL ---
+if 'menu' not in st.session_state:
+    st.session_state.menu = {
+        "🍺 Bebidas": {"Imperial": 1500, "Pilsen": 1500, "ChiliAlaska": 2000},
+        "🍔 Comida": {"Hamburguesa": 3500, "Papas": 2000},
+        "📦 Otros": {"Cigarros": 2500}
+    }
+
+st.title("💰 Gestión de Caja - Alaska")
+
+# --- PESTAÑAS ---
+tab_bebidas, tab_comida, tab_otros, tab_arqueo = st.tabs([
+    "🍺 Bebidas", "🍔 Comida", "📦 Otros", "📉 CIERRE FINAL"
+])
+
+ventas_esperadas = 0
+
+# Función para renderizar ventas
+def render_ventas(categoria, tab):
+    global ventas_esperadas
+    with tab:
+        for prod, precio in st.session_state.menu[categoria].items():
+            c1, c2 = st.columns([2, 1])
+            cant = c1.number_input(f"{prod} (₡{precio:,})", min_value=0, key=f"v_{prod}")
+            subtotal = cant * precio
+            ventas_esperadas += subtotal
+            c2.write(f"₡{subtotal:,}")
+
+render_ventas("🍺 Bebidas", tab_bebidas)
+render_ventas("🍔 Comida", tab_comida)
+render_ventas("📦 Otros", tab_otros)
+
+# --- PESTAÑA DE CIERRE Y ARQUEO ---
+with tab_arqueo:
+    st.header("🧮 Arqueo de Efectivo")
+    
+    col_billetes, col_monedas = st.columns(2)
+    
+    total_efectivo = 0
+    
+    with col_billetes:
+        st.subheader("Billetes")
+        for b in [20000, 10000, 5000, 2000, 1000]:
+            cant = st.number_input(f"₡{b:,}", min_value=0, step=1, key=f"b_{b}")
+            total_efectivo += (cant * b)
+            
+    with col_monedas:
+        st.subheader("Monedas")
+        for m in [500, 100, 50, 25, 10, 5]:
+            cant = st.number_input(f"₡{m}", min_value=0, step=1, key=f"m_{m}")
+            total_efectivo += (cant * m)
+
+    st.divider()
+    
+    st.subheader("💳 Otros Ingresos")
+    sinpe = st.number_input("Total SINPE Móvil", min_value=0)
+    tarjetas = st.number_input("Total Tarjetas (Vouchers)", min_value=0)
+    fondo_inicial = st.number_input("Fondo Inicial (Caja Chica)", min_value=0)
+
+    # CÁLCULOS FINALES
+    st.divider()
+    total_en_mano = total_efectivo + sinpe + tarjetas
+    ventas_reales_hoy = total_en_mano - fondo_inicial
+    diferencia = ventas_reales_hoy - ventas_esperadas
+
+    st.write(f"### Dinero Físico Total: ₡{total_efectivo:,}")
+    st.write(f"### Venta Neta (Sin fondo): ₡{ventas_reales_hoy:,}")
+    
+    if st.button("REALIZAR CONCILIACIÓN"):
+        if diferencia == 0:
+            st.success("🎯 ¡Perfecto! La caja cuadra exactamente.")
+        elif diferencia > 0:
+            st.warning(f"📈 Sobrante: ₡{diferencia:,}. Revisa si olvidaste anotar una venta.")
+        else:
+            st.error(f"📉 Faltante: ₡{abs(diferencia):,}. ¡Cuidado!")
+
+    # Botón para agregar productos (ahora al final o en sidebar)
+    if st.sidebar.checkbox("Configuración: Agregar Productos"):
+        st.sidebar.subheader("Nuevo Producto")
+        cat = st.sidebar.selectbox("Categoría", list(st.session_state.menu.keys()))
+        nom = st.sidebar.text_input("Nombre")
+        pre = st.sidebar.number_input("Precio", min_value=0)
+        if st.sidebar.button("Añadir"):
+            st.session_state.menu[cat][nom] = pre
+            st.rerun()
