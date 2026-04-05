@@ -5,9 +5,9 @@ st.set_page_config(page_title="Cierre Alaska", layout="centered")
 # --- BASE DE DATOS TEMPORAL ---
 if 'menu' not in st.session_state:
     st.session_state.menu = {
-        "🍺 Bebidas": {"Imperial": 1500, "Pilsen": 1500, "ChiliAlaska": 2000},
+        "🍺 Bebidas": {"Imperial": 1300, "Pilsen": 1500, "ChiliAlaska"},
         "🍔 Comida": {"Hamburguesa": 3500, "Papas": 2000},
-        "📦 Otros": {"Cigarros": 2500}
+        "📦 Otros": {"Cigarros": 200}
     }
 
 st.title("💰 Gestión de Caja - Alaska")
