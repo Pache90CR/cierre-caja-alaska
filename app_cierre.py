@@ -115,11 +115,35 @@ with tab_arqueo:
 # --- SIDEBAR: GESTIÓN DE PRODUCTOS ---
 st.sidebar.divider()
 if st.sidebar.checkbox("⚙️ Configurar Productos"):
-    # (Aquí va el código de añadir/eliminar que ya teníamos, usando st.session_state.count_add)
-    cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"])
+    
+    # SECCIÓN AÑADIR
+    st.sidebar.subheader("Añadir")
+    cat_add = st.sidebar.selectbox("Categoría a añadir", ["🍺 Bebidas", "📦 Otros"], key="cat_add_sidebar")
     nom_add = st.sidebar.text_input("Nombre", key=f"add_n_{st.session_state.count_add}")
     pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"add_p_{st.session_state.count_add}")
-    if st.sidebar.button("Añadir"):
-        st.session_state.menu[cat_add][nom_add] = pre_add
-        st.session_state.count_add += 1
-        st.rerun()
+    
+    if st.sidebar.button("Guardar Producto", use_container_width=True):
+        if nom_add:
+            st.session_state.menu[cat_add][nom_add] = pre_add
+            st.session_state.count_add += 1
+            st.sidebar.success(f"¡{nom_add} añadido!")
+            st.rerun()
+
+    st.sidebar.divider()
+
+    # SECCIÓN ELIMINAR
+    st.sidebar.subheader("Eliminar")
+    cat_del = st.sidebar.selectbox("Categoría a limpiar", ["🍺 Bebidas", "📦 Otros"], key="cat_del_sidebar")
+    
+    # Solo mostramos el selector si hay productos en esa categoría
+    opciones_del = list(st.session_state.menu[cat_del].keys())
+    
+    if opciones_del:
+        prod_del = st.sidebar.selectbox("Selecciona producto a borrar", opciones_del, key="prod_del_sidebar")
+        
+        if st.sidebar.button("🗑️ ELIMINAR PERMANENTE", use_container_width=True, type="secondary"):
+            del st.session_state.menu[cat_del][prod_del]
+            st.sidebar.warning(f"Se eliminó: {prod_del}")
+            st.rerun()
+    else:
+        st.sidebar.info("No hay productos para eliminar en esta categoría.")
