@@ -5,7 +5,7 @@ st.set_page_config(page_title="Cierre Alaska", layout="centered")
 # --- BASE DE DATOS TEMPORAL ---
 if 'menu' not in st.session_state:
     st.session_state.menu = {
-        "🍺 Bebidas": {"Imperial": 1300, "Pilsen": 1500, "ChiliAlaska"},
+        "🍺 Bebidas": {"Imperial": 1300, "Pilsen": 1500, },
         "🍔 Comida": {"Hamburguesa": 3500, "Papas": 2000},
         "📦 Otros": {"Cigarros": 200}
     }
