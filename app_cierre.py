@@ -5,6 +5,15 @@ import pandas as pd
 from datetime import datetime
 
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
+st.markdown("""
+    <style>
+    [data-testid="column"] {
+        width: calc(50% - 1rem) !important;
+        flex: 1 1 calc(50% - 1rem) !important;
+        min-width: calc(50% - 1rem) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 1. CONEXIÓN A GOOGLE SHEETS ---
 def conectar_google():
