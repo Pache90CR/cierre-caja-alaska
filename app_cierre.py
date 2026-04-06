@@ -11,7 +11,7 @@ st.set_page_config(page_title="Cierre Alaska", layout="centered")
 st.markdown("""
     <style>
     /* 1. Forzar que las columnas se peguen al centro en móvil */
-    @media (max-width: 640px) {
+    @media (max-width: 600px) {
         div[data-testid="column"] {
             padding: 0px 2px !important; /* Quita el espacio a los lados de cada columna */
             margin: 0px !important;
@@ -76,7 +76,7 @@ ventas_esperadas = 0
 
 # --- PESTAÑA BEBIDAS (AQUÍ ES DONDE QUITÉ EL ESPACIO) ---
 with tab_bebidas:
-    st.subheader("Selección de Bebidas")
+    st.subheader("Sección Bebidas")
     busqueda = st.text_input("🔍 Filtrar...", key="search_input").lower()
     lista_completa = list(st.session_state.menu["🍺 Bebidas"].items())
     lista_filtrada = [p for p in lista_completa if busqueda in p[0].lower()]
