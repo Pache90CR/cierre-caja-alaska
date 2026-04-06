@@ -6,38 +6,34 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# --- CSS PARA ELIMINAR ESPACIOS VACÍOS (SOLO BEBIDAS) ---
+# --- EL TRUCO MAESTRO: CSS PARA FORZAR LAS 2 COLUMNAS ---
 st.markdown("""
     <style>
-    @media (max-width: 640px) {
-        /* Unir las dos columnas al centro */
-        div[data-testid="stHorizontalBlock"] {
-            gap: 2px !important;
-        }
-        div[data-testid="column"] {
-            padding: 0px !important;
-            margin: 0px !important;
-        }
-        
-        /* Ajustar el cuadro de número para eliminar el "aire" interno */
-        div[data-testid="stNumberInput"] {
-            width: 100% !important;
-        }
-        div[data-testid="stNumberInput"] div div {
-            width: 100% !important;
-            max-width: 140px !important; /* Limita el ancho total del widget */
-        }
-        
-        /* Pegar los números a los botones +/- */
-        input {
-            padding-left: 0px !important;
-            padding-right: 0px !important;
-            text-align: center !important;
-        }
-
-        /* Alinear etiquetas para que se encuentren al centro */
-        .col-izq label { text-align: right !important; width: 100%; display: block; }
-        .col-der label { text-align: left !important; width: 100%; display: block; }
+    /* Este bloque obliga a las columnas a quedarse una a la par de la otra SIEMPRE */
+    [data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important; /* Prohíbe que la columna 2 se baje */
+        gap: 5px !important;
+    }
+    [data-testid="column"] {
+        width: 50% !important;
+        flex: 1 1 50% !important;
+        min-width: 48% !important;
+    }
+    /* Quitar el aire innecesario de los lados de los números */
+    div[data-testid="stNumberInput"] div div {
+        width: 100% !important;
+        margin: 0px !important;
+        padding: 0px !important;
+    }
+    input {
+        text-align: center !important;
+    }
+    /* Hacer las letras un poco más pequeñas para que quepan 2 productos */
+    label p {
+        font-size: 14px !important;
+        white-space: nowrap !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -55,7 +51,7 @@ def conectar_google():
 
 doc = conectar_google()
 
-# --- 2. GESTIÓN DE DATOS ---
+# --- 2. CARGA DE DATOS ---
 if doc:
     hoja_prod = doc.worksheet("Productos")
     hoja_cierre = doc.worksheet("Cierres")
@@ -69,59 +65,48 @@ if doc:
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
 
-# --- 3. FUNCIONES ---
-def limpiar_cierre():
-    for key in list(st.session_state.keys()):
-        if key.startswith(('bebida_', 'otro_', 'billete_', 'moneda_', 'pago_', 'monto_total_comida')):
-            st.session_state[key] = 0
-    st.toast("✅ Cierre reiniciado", icon="🧹")
-
-st.title("💰 Gestión Alaska")
-
-# --- 4. PESTAÑAS ---
+# --- 3. PESTAÑAS ---
 tab_bebidas, tab_comida, tab_otros, tab_arqueo = st.tabs([
     "🍺 Bebidas", "🍳 Comidas", "📦 Otros", "📉 CIERRE"
 ])
 
 ventas_esperadas = 0
 
-# --- PESTAÑA BEBIDAS (Diseño Corregido) ---
+# --- PESTAÑA BEBIDAS (EL ÚNICO CAMBIO REAL) ---
 with tab_bebidas:
+    st.subheader("Selección de Bebidas")
     busqueda = st.text_input("🔍 Filtrar...", key="search_input").lower()
     lista_completa = list(st.session_state.menu["🍺 Bebidas"].items())
     lista_filtrada = [p for p in lista_completa if busqueda in p[0].lower()]
     
+    # Aquí forzamos las dos columnas: Imperial a la izq, Light a la der.
     for i in range(0, len(lista_filtrada), 2):
-        c1, c2 = st.columns(2)
+        col1, col2 = st.columns(2)
         
-        # Columna Izquierda (Alineada a la derecha)
         p1, pre1 = lista_filtrada[i]
-        with c1:
-            st.markdown('<div class="col-izq">', unsafe_allow_html=True)
+        with col1:
             st.number_input(p1, min_value=0, step=1, key=f"bebida_{p1}")
-            st.markdown('</div>', unsafe_allow_html=True)
         
-        # Columna Derecha (Alineada a la izquierda)
         if i + 1 < len(lista_filtrada):
             p2, pre2 = lista_filtrada[i+1]
-            with c2:
-                st.markdown('<div class="col-der">', unsafe_allow_html=True)
+            with col2:
                 st.number_input(p2, min_value=0, step=1, key=f"bebida_{p2}")
-                st.markdown('</div>', unsafe_allow_html=True)
 
     total_bebidas = sum(st.session_state.get(f"bebida_{p}", 0) * pre for p, pre in lista_completa)
     ventas_esperadas += total_bebidas
 
-# --- PESTAÑAS ORIGINALES (Sin cambios de diseño) ---
+# --- PESTAÑA COMIDAS (SIN CAMBIOS) ---
 with tab_comida:
     monto_comida = st.number_input("Total Comandas Cocina (₡)", min_value=0, step=500, key="monto_total_comida")
     ventas_esperadas += monto_comida
 
+# --- PESTAÑA OTROS (SIN CAMBIOS) ---
 with tab_otros:
     for prod, precio in st.session_state.menu["📦 Otros"].items():
         cant = st.number_input(f"{prod} (₡{precio:,})", min_value=0, key=f"otro_{prod}")
         ventas_esperadas += (cant * precio)
 
+# --- PESTAÑA CIERRE FINAL (SIN CAMBIOS) ---
 with tab_arqueo:
     st.header("🧮 Arqueo")
     total_efectivo = 0
@@ -133,7 +118,6 @@ with tab_arqueo:
         for m in [500, 100, 50, 25, 10, 5]:
             total_efectivo += st.number_input(f"₡{m}", min_value=0, key=f"moneda_{m}") * m
 
-    st.divider()
     sinpe = st.number_input("Total SINPE", min_value=0, key="pago_sinpe")
     tarjetas = st.number_input("Total Tarjetas", min_value=0, key="pago_tarjeta")
     pendientes = st.number_input("Pendientes", min_value=0, key="pago_pendientes")
@@ -143,16 +127,18 @@ with tab_arqueo:
     ventas_reales = total_reportado - fondo
     dif = ventas_reales - ventas_esperadas
 
-    st.write(f"### Venta Neta: ₡{ventas_reales:,}")
+    st.write(f"### Venta Neta: ₡{ventas_reales:,} | Esperada: ₡{ventas_esperadas:,}")
     if st.button("💾 GUARDAR CIERRE", use_container_width=True):
         fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
         hoja_cierre.append_row([fecha, ventas_esperadas, total_reportado, dif])
         st.success("✅ Cierre guardado")
 
-# --- SIDEBAR ---
+# --- SIDEBAR (SÓLO ACCIONES) ---
 st.sidebar.header("🧹 Acciones")
 if st.sidebar.button("LIMPIAR TODO"):
-    limpiar_cierre()
+    for key in list(st.session_state.keys()):
+        if key.startswith(('bebida_', 'otro_', 'billete_', 'moneda_', 'pago_', 'monto_total_comida')):
+            st.session_state[key] = 0
     st.rerun()
 
 if st.sidebar.checkbox("⚙️ Configurar Menú"):
@@ -162,8 +148,5 @@ if st.sidebar.checkbox("⚙️ Configurar Menú"):
     if st.sidebar.button("➕ Guardar"):
         hoja_prod.append_row([cat, nom, pre])
         st.session_state.reset_key += 1
-        del st.session_state.menu
+        if 'menu' in st.session_state: del st.session_state.menu
         st.rerun()
-
-
-
