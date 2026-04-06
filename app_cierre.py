@@ -7,26 +7,24 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# CSS SOLO PARA LA PESTAÑA DE BEBIDAS (Para pegar las columnas y quitar espacios)
+# CSS AGRESIVO: Solo afecta a la pestaña de Bebidas para quitar los huecos rojos
 st.markdown("""
     <style>
-    /* Forzar 2 columnas pegadas en móvil */
+    /* 1. Forzar que las columnas se peguen al centro en móvil */
     @media (max-width: 640px) {
-        [data-testid="stHorizontalBlock"] {
-            display: flex !important;
-            flex-direction: row !important;
-            flex-wrap: nowrap !important;
-            gap: 2px !important; /* Espacio mínimo entre columna 1 y 2 */
+        div[data-testid="column"] {
+            padding: 0px 2px !important; /* Quita el espacio a los lados de cada columna */
+            margin: 0px !important;
         }
-        [data-testid="column"] {
-            width: 50% !important;
-            flex: 1 1 50% !important;
-            min-width: 48% !important;
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0px !important; /* Quita el espacio entre la columna 1 y la 2 */
         }
-        /* Quitar el espacio vacío interno del número para que se pegue al centro */
-        div[data-testid="stNumberInput"] {
+        /* 2. Estirar el cuadro del número para que no tenga aire a los lados */
+        div[data-testid="stNumberInput"] div {
             width: 100% !important;
-            margin-bottom: 0px !important;
+        }
+        div[data-testid="stNumberInput"] input {
+            width: 100% !important;
         }
     }
     </style>
@@ -50,7 +48,6 @@ doc = conectar_google()
 if doc:
     hoja_prod = doc.worksheet("Productos")
     hoja_cierre = doc.worksheet("Cierres")
-
     if 'menu' not in st.session_state:
         datos = hoja_prod.get_all_records()
         menu_temp = {"🍺 Bebidas": {}, "📦 Otros": {}}
@@ -70,20 +67,14 @@ def limpiar_cierre():
 
 st.title("💰 Gestión Alaska")
 
-# Botón Limpiar en Sidebar
-st.sidebar.header("🧹 Acciones")
-if st.sidebar.button("LIMPIAR TODO EL CIERRE", use_container_width=True, type="primary"):
-    limpiar_cierre()
-    st.rerun()
-
-# --- 4. PESTAÑAS (Vuelven a su diseño original menos Bebidas) ---
+# --- 4. PESTAÑAS ---
 tab_bebidas, tab_comida, tab_otros, tab_arqueo = st.tabs([
     "🍺 Bebidas", "🍳 Comidas", "📦 Otros", "📉 CIERRE"
 ])
 
 ventas_esperadas = 0
 
-# --- PESTAÑA BEBIDAS (Diseño de 2 columnas sin espacios vacíos) ---
+# --- PESTAÑA BEBIDAS (AQUÍ ES DONDE QUITÉ EL ESPACIO) ---
 with tab_bebidas:
     st.subheader("Selección de Bebidas")
     busqueda = st.text_input("🔍 Filtrar...", key="search_input").lower()
@@ -104,23 +95,22 @@ with tab_bebidas:
     total_bebidas = sum(st.session_state.get(f"bebida_{p}", 0) * pre for p, pre in lista_completa)
     ventas_esperadas += total_bebidas
 
-# --- PESTAÑA COMIDAS (Original) ---
+# --- PESTAÑA COMIDAS (ORIGINAL) ---
 with tab_comida:
     st.subheader("Suma de Comandas")
     monto_comida = st.number_input("Total Ventas de Cocina (₡)", min_value=0, step=500, key="monto_total_comida")
     ventas_esperadas += monto_comida
 
-# --- PESTAÑA OTROS (Original) ---
+# --- PESTAÑA OTROS (ORIGINAL) ---
 with tab_otros:
     st.subheader("Otros Productos")
-    # Volvemos a lista simple para que no use el diseño de 2 columnas si no lo quieres aquí
     for prod, precio in st.session_state.menu["📦 Otros"].items():
         cant = st.number_input(f"{prod} (₡{precio:,})", min_value=0, key=f"otro_{prod}")
         ventas_esperadas += (cant * precio)
 
-# --- PESTAÑA CIERRE FINAL (Original) ---
+# --- PESTAÑA CIERRE FINAL (ORIGINAL) ---
 with tab_arqueo:
-    st.header("🧮 Arqueo de Efectivo")
+    st.header("🧮 Arqueo")
     col_b, col_m = st.columns(2)
     total_efectivo = 0
     with col_b:
@@ -131,7 +121,7 @@ with tab_arqueo:
             total_efectivo += st.number_input(f"₡{m}", min_value=0, step=1, key=f"moneda_{m}") * m
 
     st.divider()
-    sinpe = st.number_input("Total SINPE Móvil", min_value=0, key="pago_sinpe")
+    sinpe = st.number_input("Total SINPE", min_value=0, key="pago_sinpe")
     tarjetas = st.number_input("Total Tarjetas", min_value=0, key="pago_tarjeta")
     pendientes = st.number_input("Pendientes (Fiados)", min_value=0, key="pago_pendientes")
     fondo = st.number_input("Fondo Inicial", min_value=0, key="caja_fondo")
@@ -141,35 +131,23 @@ with tab_arqueo:
     dif = ventas_reales - ventas_esperadas
 
     st.write(f"### Venta Neta: ₡{ventas_reales:,} | Esperada: ₡{ventas_esperadas:,}")
-    
-    if st.button("💾 GUARDAR CIERRE EN EXCEL", use_container_width=True):
+    if st.button("💾 GUARDAR CIERRE", use_container_width=True):
         fecha_hoy = datetime.now().strftime("%d/%m/%Y %H:%M")
         hoja_cierre.append_row([fecha_hoy, ventas_esperadas, total_reportado, dif])
-        st.success("✅ Cierre guardado exitosamente.")
+        st.success("✅ ¡Cierre guardado!")
 
-# --- SIDEBAR: GESTIÓN DE PRODUCTOS ---
-st.sidebar.divider()
+# --- SIDEBAR (LIMPIAR Y GESTIÓN) ---
+st.sidebar.header("🧹 Acciones")
+if st.sidebar.button("LIMPIAR TODO"):
+    limpiar_cierre()
+    st.rerun()
+
 if st.sidebar.checkbox("⚙️ Configurar Menú"):
-    st.sidebar.subheader("Añadir")
     cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"])
-    nom_add = st.sidebar.text_input("Nombre", key=f"input_nom_{st.session_state.reset_key}")
-    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"input_pre_{st.session_state.reset_key}")
-    
-    if st.sidebar.button("➕ Guardar en Excel", use_container_width=True):
-        if nom_add:
-            hoja_prod.append_row([cat_add, nom_add, pre_add])
-            st.session_state.reset_key += 1
-            if 'menu' in st.session_state: del st.session_state.menu
-            st.rerun()
-
-    st.sidebar.divider()
-    st.sidebar.subheader("Eliminar")
-    cat_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"])
-    prods = list(st.session_state.menu[cat_del].keys())
-    if prods:
-        prod_del = st.sidebar.selectbox("Producto a borrar", prods)
-        if st.sidebar.button("🗑️ Borrar de Excel", use_container_width=True):
-            celda = hoja_prod.find(prod_del)
-            hoja_prod.delete_rows(celda.row)
-            if 'menu' in st.session_state: del st.session_state.menu
-            st.rerun()
+    nom_add = st.sidebar.text_input("Nombre", key=f"in_{st.session_state.reset_key}")
+    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"ip_{st.session_state.reset_key}")
+    if st.sidebar.button("➕ Guardar"):
+        hoja_prod.append_row([cat_add, nom_add, pre_add])
+        st.session_state.reset_key += 1
+        del st.session_state.menu
+        st.rerun()
