@@ -11,7 +11,7 @@ st.set_page_config(page_title="Cierre Alaska", layout="centered")
 st.markdown("""
     <style>
     /* 1. Forzar que las columnas se peguen al centro en móvil */
-    @media (max-width: 2000px) {
+    @media (max-width: 640px) {
         div[data-testid="column"] {
             padding: 0px 2px !important; /* Quita el espacio a los lados de cada columna */
             margin: 0px !important;
