@@ -4,13 +4,21 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
+# --- CONFIGURACIÓN DE PÁGINA Y FORZADO DE 2 COLUMNAS EN MÓVIL ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
+
 st.markdown("""
     <style>
+    /* Forzar que las columnas no se apilen en el celular */
     [data-testid="column"] {
         width: calc(50% - 1rem) !important;
         flex: 1 1 calc(50% - 1rem) !important;
         min-width: calc(50% - 1rem) !important;
+    }
+    /* Ajustar el tamaño de letra en móvil para que quepa todo */
+    @media (max-width: 640px) {
+        .stMarkdown p { font-size: 14px; }
+        .stNumberInput label { font-size: 12px; }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -29,12 +37,11 @@ def conectar_google():
 
 doc = conectar_google()
 
-# --- 2. GESTIÓN DE DATOS ---
+# --- 2. GESTIÓN DE DATOS Y MEMORIA ---
 if doc:
     hoja_prod = doc.worksheet("Productos")
     hoja_cierre = doc.worksheet("Cierres")
 
-    # Cargar menú desde Excel
     if 'menu' not in st.session_state:
         datos = hoja_prod.get_all_records()
         menu_temp = {"🍺 Bebidas": {}, "📦 Otros": {}}
@@ -42,9 +49,12 @@ if doc:
             menu_temp[fila['Categoria']][fila['Producto']] = fila['Precio']
         st.session_state.menu = menu_temp
 
-# --- 3. FUNCIONES DE APOYO ---
+if 'reset_key' not in st.session_state:
+    st.session_state.reset_key = 0
+
+# --- 3. FUNCIONES ---
 def limpiar_cierre():
-    for key in st.session_state.keys():
+    for key in list(st.session_state.keys()):
         if key.startswith(('bebida_', 'otro_', 'billete_', 'moneda_', 'pago_', 'monto_total_comida')):
             st.session_state[key] = 0
     st.toast("✅ Campos reiniciados", icon="🧹")
@@ -59,36 +69,40 @@ if st.sidebar.button("LIMPIAR TODO EL CIERRE", use_container_width=True, type="p
 
 # --- 4. PESTAÑAS ---
 tab_bebidas, tab_comida, tab_otros, tab_arqueo = st.tabs([
-    "🍺 Bebidas", "🍳 Ventas Comida", "📦 Otros", "📉 CIERRE FINAL"
+    "🍺 Bebidas", "🍳 Comidas", "📦 Otros", "📉 CIERRE FINAL"
 ])
 
 ventas_esperadas = 0
 
-# PESTAÑA BEBIDAS
+# --- PESTAÑA BEBIDAS (2 COLUMNAS FORZADAS) ---
 with tab_bebidas:
     st.subheader("Selección de Bebidas")
-    busqueda = st.text_input("🔍 Filtrar bebida...", key="search_input").lower()
+    busqueda = st.text_input("🔍 Filtrar...", key="search_input").lower()
+    
     lista_completa = list(st.session_state.menu["🍺 Bebidas"].items())
     lista_filtrada = [p for p in lista_completa if busqueda in p[0].lower()]
     
     for i in range(0, len(lista_filtrada), 2):
         c1, c2 = st.columns(2)
         p1, pre1 = lista_filtrada[i]
-        with c1: st.number_input(f"{p1} (₡{pre1:,})", min_value=0, step=1, key=f"bebida_{p1}")
+        with c1: 
+            st.number_input(f"{p1} (₡{pre1:,})", min_value=0, step=1, key=f"bebida_{p1}")
+        
         if i + 1 < len(lista_filtrada):
             p2, pre2 = lista_filtrada[i+1]
-            with c2: st.number_input(f"{p2} (₡{pre2:,})", min_value=0, step=1, key=f"bebida_{p2}")
+            with c2: 
+                st.number_input(f"{p2} (₡{pre2:,})", min_value=0, step=1, key=f"bebida_{p2}")
 
     total_bebidas = sum(st.session_state.get(f"bebida_{p}", 0) * pre for p, pre in lista_completa)
     ventas_esperadas += total_bebidas
 
-# PESTAÑA COMIDA
+# --- PESTAÑA COMIDA (COMANDAS) ---
 with tab_comida:
     st.subheader("Suma de Comandas")
     monto_comida = st.number_input("Total Ventas de Cocina (₡)", min_value=0, step=500, key="monto_total_comida")
     ventas_esperadas += monto_comida
 
-# PESTAÑA OTROS
+# --- PESTAÑA OTROS ---
 with tab_otros:
     st.subheader("Otros Productos")
     lista_otros = list(st.session_state.menu["📦 Otros"].items())
@@ -103,7 +117,7 @@ with tab_otros:
     total_otros = sum(st.session_state.get(f"otro_{p}", 0) * pre for p, pre in lista_otros)
     ventas_esperadas += total_otros
 
-# PESTAÑA CIERRE FINAL
+# --- PESTAÑA CIERRE FINAL ---
 with tab_arqueo:
     st.header("🧮 Arqueo de Efectivo")
     col_b, col_m = st.columns(2)
@@ -125,60 +139,38 @@ with tab_arqueo:
     ventas_reales = total_reportado - fondo
     dif = ventas_reales - ventas_esperadas
 
-    st.write(f"### Venta Neta: ₡{ventas_reales:,} | Esperada: ₡{ventas_esperadas:,}")
+    st.write(f"### Venta Neta: ₡{ventas_reales:,}")
+    st.write(f"### Esperada: ₡{ventas_esperadas:,}")
     
-    if st.button("GUARDAR CIERRE EN GOOGLE SHEETS", use_container_width=True):
-        fecha_hoy = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if st.button("💾 GUARDAR CIERRE EN EXCEL", use_container_width=True):
+        fecha_hoy = datetime.now().strftime("%d/%m/%Y %H:%M")
         hoja_cierre.append_row([fecha_hoy, ventas_esperadas, total_reportado, dif])
-        st.success("✅ Cierre guardado exitosamente en el Excel.")
+        st.success("✅ ¡Cierre guardado en Google Sheets!")
 
-# --- SIDEBAR: GESTIÓN DE PRODUCTOS CON AUTOLIMPIEZA ---
+# --- SIDEBAR: GESTIÓN DE PRODUCTOS ---
 st.sidebar.divider()
-
-# Creamos un contador de reseteo si no existe
-if 'reset_key' not in st.session_state:
-    st.session_state.reset_key = 0
-
-if st.sidebar.checkbox("⚙️ Configurar Productos"):
+if st.sidebar.checkbox("⚙️ Configurar Menú"):
     st.sidebar.subheader("Añadir")
-    cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="cat_add_sidebar")
+    cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="sidebar_cat_add")
+    nom_add = st.sidebar.text_input("Nombre", key=f"input_nom_{st.session_state.reset_key}")
+    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"input_pre_{st.session_state.reset_key}")
     
-    # Usamos el contador en la key para forzar la limpieza al guardar
-    nom_add = st.sidebar.text_input("Nombre", key=f"nom_add_{st.session_state.reset_key}")
-    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"pre_add_{st.session_state.reset_key}")
-    
-    if st.sidebar.button("Guardar en Excel", use_container_width=True):
+    if st.sidebar.button("➕ Guardar en Excel", use_container_width=True):
         if nom_add:
-            # 1. Guardar en Google Sheets
             hoja_prod.append_row([cat_add, nom_add, pre_add])
-            
-            # 2. Aumentar el contador para limpiar las casillas
             st.session_state.reset_key += 1
-            
-            # 3. Limpiar memoria local para forzar recarga desde Excel
-            if 'menu' in st.session_state:
-                del st.session_state.menu
-            
-            st.sidebar.success(f"¡{nom_add} guardado y campos limpios!")
+            if 'menu' in st.session_state: del st.session_state.menu
+            st.sidebar.success(f"{nom_add} añadido.")
             st.rerun()
 
     st.sidebar.divider()
     st.sidebar.subheader("Eliminar")
-    cat_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="cat_del_sidebar")
-    
-    # Verificamos que el menú exista para listar productos
-    if 'menu' in st.session_state:
-        prods = list(st.session_state.menu[cat_del].keys())
-        if prods:
-            prod_del = st.sidebar.selectbox("Producto a borrar", prods, key="prod_del_sidebar")
-            if st.sidebar.button("🗑️ Borrar de Excel", use_container_width=True):
-                # Buscar y borrar en Sheets
-                try:
-                    celda = hoja_prod.find(prod_del)
-                    hoja_prod.delete_rows(celda.row)
-                    if 'menu' in st.session_state:
-                        del st.session_state.menu
-                    st.sidebar.warning(f"Se eliminó: {prod_del}")
-                    st.rerun()
-                except:
-                    st.sidebar.error("No se pudo encontrar el producto en Excel.")
+    cat_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="sidebar_cat_del")
+    prods = list(st.session_state.menu[cat_del].keys())
+    if prods:
+        prod_del = st.sidebar.selectbox("Producto a borrar", prods)
+        if st.sidebar.button("🗑️ Borrar de Excel", use_container_width=True):
+            celda = hoja_prod.find(prod_del)
+            hoja_prod.delete_rows(celda.row)
+            if 'menu' in st.session_state: del st.session_state.menu
+            st.rerun()
