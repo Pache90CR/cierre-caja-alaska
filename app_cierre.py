@@ -4,34 +4,40 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE PÁGINA Y DISEÑO ULTRA COMPACTO ---
+# --- CONFIGURACIÓN DE PÁGINA Y DISEÑO PARA MÓVIL ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
 st.markdown("""
     <style>
-    /* 1. Forzar 2 columnas reales en móvil */
-    [data-testid="column"] {
-        width: 48% !important;
-        flex: 1 1 48% !important;
-        min-width: 48% !important;
-        margin: 0px !important;
-        padding: 5px !important;
-    }
+    /* 1. Forzar 2 columnas en móvil sin que se amontonen */
     [data-testid="stHorizontalBlock"] {
-        gap: 0px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 5px !important;
     }
-    /* 2. Encoger los cuadros de número (quitar botones grandes) */
-    div[data-testid="stNumberInput"] button {
-        display: none !important; /* Quitamos los botones + y - para ganar espacio */
+    [data-testid="column"] {
+        width: 50% !important;
+        flex: 1 1 50% !important;
+        min-width: 48% !important;
     }
-    div[data-testid="stNumberInput"] input {
-        padding: 5px !important;
-        text-align: center !important;
+    /* 2. Ajustar el ancho del selector de número para que no sobre espacio */
+    div[data-testid="stNumberInput"] {
+        width: 100% !important;
     }
-    /* 3. Reducir márgenes de etiquetas */
+    /* 3. Hacer los botones +/- y el cuadro de texto más compactos */
+    div[data-testid="stNumberInput"] div div {
+        gap: 2px !important;
+    }
+    input {
+        padding: 2px !important;
+    }
+    /* 4. Etiquetas más pequeñas para que no empujen el diseño */
     label {
-        font-size: 0.8rem !important;
-        margin-bottom: 0px !important;
+        font-size: 13px !important;
+        white-space: nowrap !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -87,7 +93,7 @@ tab_bebidas, tab_comida, tab_otros, tab_arqueo = st.tabs([
 
 ventas_esperadas = 0
 
-# --- PESTAÑA BEBIDAS (DISEÑO COMPACTO) ---
+# --- PESTAÑA BEBIDAS ---
 with tab_bebidas:
     busqueda = st.text_input("🔍 Filtrar...", key="search_input").lower()
     lista_completa = list(st.session_state.menu["🍺 Bebidas"].items())
@@ -107,7 +113,7 @@ with tab_bebidas:
     total_bebidas = sum(st.session_state.get(f"bebida_{p}", 0) * pre for p, pre in lista_completa)
     ventas_esperadas += total_bebidas
 
-# --- PESTAÑA COMIDA (COMANDAS) ---
+# --- PESTAÑA COMIDA ---
 with tab_comida:
     monto_comida = st.number_input("Total Comandas Cocina (₡)", min_value=0, step=500, key="monto_total_comida")
     ventas_esperadas += monto_comida
@@ -175,7 +181,11 @@ if st.sidebar.checkbox("⚙️ Configurar Menú"):
     if prods:
         prod_del = st.sidebar.selectbox("Borrar producto", prods)
         if st.sidebar.button("🗑️ Borrar", use_container_width=True):
-            celda = hoja_prod.find(prod_del)
-            hoja_prod.delete_rows(celda.row)
-            if 'menu' in st.session_state: del st.session_state.menu
-            st.rerun()
+            try:
+                celda = hoja_prod.find(prod_del)
+                hoja_prod.delete_rows(celda.row)
+                if 'menu' in st.session_state: del st.session_state.menu
+                st.rerun()
+            except:
+                st.sidebar.error("Error al borrar")
+
