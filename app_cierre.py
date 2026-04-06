@@ -123,28 +123,53 @@ with tab_arqueo:
         hoja_cierre.append_row([fecha_hoy, ventas_esperadas, total_reportado, dif])
         st.success("✅ Cierre guardado exitosamente en el Excel.")
 
-# --- SIDEBAR: GESTIÓN DE PRODUCTOS ---
+# --- SIDEBAR: GESTIÓN DE PRODUCTOS CON AUTOLIMPIEZA ---
 st.sidebar.divider()
+
+# Creamos un contador de reseteo si no existe
+if 'reset_key' not in st.session_state:
+    st.session_state.reset_key = 0
+
 if st.sidebar.checkbox("⚙️ Configurar Productos"):
     st.sidebar.subheader("Añadir")
-    cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"])
-    nom_add = st.sidebar.text_input("Nombre")
-    pre_add = st.sidebar.number_input("Precio", min_value=0)
+    cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="cat_add_sidebar")
     
-    if st.sidebar.button("Guardar en Excel"):
+    # Usamos el contador en la key para forzar la limpieza al guardar
+    nom_add = st.sidebar.text_input("Nombre", key=f"nom_add_{st.session_state.reset_key}")
+    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"pre_add_{st.session_state.reset_key}")
+    
+    if st.sidebar.button("Guardar en Excel", use_container_width=True):
         if nom_add:
+            # 1. Guardar en Google Sheets
             hoja_prod.append_row([cat_add, nom_add, pre_add])
-            st.session_state.clear() # Forzamos recarga
+            
+            # 2. Aumentar el contador para limpiar las casillas
+            st.session_state.reset_key += 1
+            
+            # 3. Limpiar memoria local para forzar recarga desde Excel
+            if 'menu' in st.session_state:
+                del st.session_state.menu
+            
+            st.sidebar.success(f"¡{nom_add} guardado y campos limpios!")
             st.rerun()
 
     st.sidebar.divider()
     st.sidebar.subheader("Eliminar")
-    cat_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"])
-    prods = list(st.session_state.menu[cat_del].keys())
-    if prods:
-        prod_del = st.sidebar.selectbox("Producto", prods)
-        if st.sidebar.button("🗑️ Borrar de Excel"):
-            celda = hoja_prod.find(prod_del)
-            hoja_prod.delete_rows(celda.row)
-            st.session_state.clear()
-            st.rerun()
+    cat_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="cat_del_sidebar")
+    
+    # Verificamos que el menú exista para listar productos
+    if 'menu' in st.session_state:
+        prods = list(st.session_state.menu[cat_del].keys())
+        if prods:
+            prod_del = st.sidebar.selectbox("Producto a borrar", prods, key="prod_del_sidebar")
+            if st.sidebar.button("🗑️ Borrar de Excel", use_container_width=True):
+                # Buscar y borrar en Sheets
+                try:
+                    celda = hoja_prod.find(prod_del)
+                    hoja_prod.delete_rows(celda.row)
+                    if 'menu' in st.session_state:
+                        del st.session_state.menu
+                    st.sidebar.warning(f"Se eliminó: {prod_del}")
+                    st.rerun()
+                except:
+                    st.sidebar.error("No se pudo encontrar el producto en Excel.")
