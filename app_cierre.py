@@ -4,18 +4,28 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE PÁGINA (El diseño que te gustó) ---
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
+# CSS QUIRÚRGICO PARA ALINEAR EL NÚMERO A LA IZQUIERDA (SOLO BEBIDAS)
 st.markdown("""
     <style>
-    @media (max-width: 640px) {
-        div[data-testid="column"] { padding: 0px 1px !important; margin: 0px !important; }
-        div[data-testid="stHorizontalBlock"] { gap: 0px !important; }
+    /* Compactar el cuadro y alinear el número a la izquierda */
+    div[data-testid="stNumberInput"] input {
+        text-align: left !important;
+        padding-left: 10px !important;
     }
-    div[data-testid="stNumberInput"] div { margin: 0px auto !important; padding: 0px !important; max-width: 140px !important; }
-    [data-testid="stMarkdown"] p { font-size: 13px !important; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px !important; }
-    .ganancia-card { background-color: #1e2129; padding: 20px; border-radius: 10px; border-left: 5px solid #2ecc71; }
+    /* Reducir el ancho máximo del control para que no se estire innecesariamente */
+    div[data-testid="stNumberInput"] {
+        max-width: 150px !important;
+    }
+    /* Estilo para la tarjeta de ganancia */
+    .ganancia-card { 
+        background-color: #1e2129; 
+        padding: 20px; 
+        border-radius: 10px; 
+        border-left: 5px solid #2ecc71; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -53,18 +63,16 @@ tab_bebidas, tab_comida, tab_otros, tab_arqueo, tab_ganancia = st.tabs([
 ventas_esperadas = 0.0
 costos_totales = 0.0
 
-# --- PESTAÑA BEBIDAS ---
+# --- PESTAÑA BEBIDAS (ALINEADA) ---
 with tab_bebidas:
+    st.subheader("Selección de Bebidas")
     busqueda = st.text_input("🔍 Filtrar bebida...", key="search_input").lower()
     lista_completa = list(st.session_state.menu["🍺 Bebidas"].items())
     lista_filtrada = [p for p in lista_completa if busqueda in p[0].lower()]
-    for i in range(0, len(lista_filtrada), 2):
-        c1, c2 = st.columns(2)
-        p1, val1 = lista_filtrada[i]
-        with c1: st.number_input(f"{p1}", min_value=0, step=1, key=f"bebida_{p1}")
-        if i + 1 < len(lista_filtrada):
-            p2, val2 = lista_filtrada[i+1]
-            with c2: st.number_input(f"{p2}", min_value=0, step=1, key=f"bebida_{p2}")
+    
+    for p, v in lista_filtrada:
+        # Aquí el CSS hace que el número se pegue a la izquierda
+        st.number_input(f"{p}", min_value=0, step=1, key=f"bebida_{p}")
 
     for p, v in lista_completa:
         cant = st.session_state.get(f"bebida_{p}", 0)
@@ -75,17 +83,17 @@ with tab_bebidas:
 with tab_comida:
     monto_comida = st.number_input("Total Comandas Cocina (₡)", min_value=0, step=500, key="monto_total_comida")
     ventas_esperadas += monto_comida
-    costos_totales += (monto_comida * 0.6) # Costo estimado 60%
+    costos_totales += (monto_comida * 0.6)
 
 # --- PESTAÑA OTROS ---
 with tab_otros:
     lista_o = list(st.session_state.menu["📦 Otros"].items())
     for p, v in lista_o:
-        cant = st.number_input(f"{p}", min_value=0, key=f"otro_{p}")
+        cant = st.number_input(f"{p} (₡{v[0]:,})", min_value=0, key=f"otro_{p}")
         ventas_esperadas += (cant * v[0])
         costos_totales += (cant * v[1])
 
-# --- PESTAÑA ARQUEO (RESTAURADA) ---
+# --- PESTAÑA ARQUEO ---
 with tab_arqueo:
     st.header("🧮 Arqueo de Caja")
     col_b, col_m = st.columns(2)
@@ -115,24 +123,13 @@ with tab_arqueo:
         hoja_cierre.append_row([fecha, ventas_reales, ganancia_dia, dif])
         st.success("✅ Cierre guardado correctamente.")
 
-# --- PESTAÑA GANANCIAS (NUEVA) ---
+# --- PESTAÑA GANANCIAS ---
 with tab_ganancia:
     st.header("📊 Análisis de Ganancia")
     ganancia_neta = ventas_esperadas - costos_totales
-    
-    st.markdown(f"""
-    <div class='ganancia-card'>
-        <h3>Utilidad del Día</h3>
-        <h1 style='color: #2ecc71;'>₡{ganancia_neta:,}</h1>
-        <p>Esta es tu ganancia neta después de restar los costos de productos.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if ventas_esperadas > 0:
-        margen = (ganancia_neta / ventas_esperadas) * 100
-        st.metric("Margen de Utilidad", f"{round(margen, 1)}%")
+    st.markdown(f"""<div class='ganancia-card'><h3>Utilidad Estimada</h3><h1 style='color: #2ecc71;'>₡{ganancia_neta:,}</h1></div>""", unsafe_allow_html=True)
 
-# --- SIDEBAR (AGREGAR Y ELIMINAR RESTAURADOS) ---
+# --- SIDEBAR (GESTIÓN) ---
 st.sidebar.header("🧹 Acciones")
 if st.sidebar.button("LIMPIAR CIERRE"):
     for key in list(st.session_state.keys()):
@@ -146,22 +143,21 @@ if st.sidebar.checkbox("⚙️ Gestionar Menú"):
     nom_add = st.sidebar.text_input("Nombre", key=f"n_{st.session_state.reset_key}")
     pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"p_{st.session_state.reset_key}")
     cos_add = st.sidebar.number_input("Costo", min_value=0, key=f"c_{st.session_state.reset_key}")
-    
-    if st.sidebar.button("➕ Guardar en Excel"):
+    if st.sidebar.button("➕ Guardar"):
         if nom_add:
             hoja_prod.append_row([cat_add, nom_add, pre_add, cos_add])
             st.session_state.reset_key += 1
             del st.session_state.menu
             st.rerun()
-
     st.sidebar.divider()
-    st.sidebar.subheader("Eliminar Producto")
-    cat_del = st.sidebar.selectbox("Categoría a borrar", ["🍺 Bebidas", "📦 Otros"])
-    prods = list(st.session_state.menu[cat_del].keys())
-    if prods:
-        prod_del = st.sidebar.selectbox("Producto", prods)
-        if st.sidebar.button("🗑️ Eliminar"):
-            celda = hoja_prod.find(prod_del)
-            hoja_prod.delete_rows(celda.row)
-            del st.session_state.menu
-            st.rerun()
+    if 'menu' in st.session_state:
+        cat_del = st.sidebar.selectbox("Borrar de:", ["🍺 Bebidas", "📦 Otros"])
+        prods = list(st.session_state.menu[cat_del].keys())
+        if prods:
+            prod_del = st.sidebar.selectbox("Producto", prods)
+            if st.sidebar.button("🗑️ Eliminar"):
+                celda = hoja_prod.find(prod_del)
+                hoja_prod.delete_rows(celda.row)
+                del st.session_state.menu
+                st.rerun()
+
