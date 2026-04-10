@@ -18,6 +18,16 @@ st.markdown("""
     /* Reducir el ancho máximo del control para que no se estire innecesariamente */
     div[data-testid="stNumberInput"] {
         max-width: 150px !important;
+    }
+    /* Estilo para la tarjeta de ganancia */
+    .ganancia-card { 
+        background-color: #1e2129; 
+        padding: 20px; 
+        border-radius: 10px; 
+        border-left: 5px solid #2ecc71; 
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 1. CONEXIÓN ---
 def conectar_google():
