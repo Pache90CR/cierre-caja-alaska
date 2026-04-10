@@ -7,19 +7,17 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# CSS (El diseño que te gusta)
+# CSS QUIRÚRGICO PARA ALINEAR EL NÚMERO A LA IZQUIERDA (SOLO BEBIDAS)
 st.markdown("""
     <style>
-    @media (max-width: 640px) {
-        div[data-testid="column"] { padding: 0px 1px !important; margin: 0px !important; }
-        div[data-testid="stHorizontalBlock"] { gap: 0px !important; }
+    /* Compactar el cuadro y alinear el número a la izquierda */
+    div[data-testid="stNumberInput"] input {
+        text-align: left !important;
+        padding-left: 10px !important;
     }
-    div[data-testid="stNumberInput"] div { margin: 0px auto !important; padding: 0px !important; max-width: 140px !important; }
-    div[data-testid="stNumberInput"] input { text-align: left !important; padding-left: 10px !important; }
-    [data-testid="stMarkdown"] p { font-size: 13px !important; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px !important; }
-    .ganancia-card { background-color: #1e2129; padding: 20px; border-radius: 10px; border-left: 5px solid #2ecc71; margin-bottom: 20px; }
-    </style>
-    """, unsafe_allow_html=True)
+    /* Reducir el ancho máximo del control para que no se estire innecesariamente */
+    div[data-testid="stNumberInput"] {
+        max-width: 150px !important;
 
 # --- 1. CONEXIÓN ---
 def conectar_google():
