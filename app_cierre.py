@@ -7,25 +7,17 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# CSS QUIRÚRGICO PARA ALINEAR EL NÚMERO A LA IZQUIERDA (SOLO BEBIDAS)
+# CSS (El diseño que te gusta)
 st.markdown("""
     <style>
-    /* Compactar el cuadro y alinear el número a la izquierda */
-    div[data-testid="stNumberInput"] input {
-        text-align: left !important;
-        padding-left: 10px !important;
+    @media (max-width: 640px) {
+        div[data-testid="column"] { padding: 0px 1px !important; margin: 0px !important; }
+        div[data-testid="stHorizontalBlock"] { gap: 0px !important; }
     }
-    /* Reducir el ancho máximo del control para que no se estire innecesariamente */
-    div[data-testid="stNumberInput"] {
-        max-width: 150px !important;
-    }
-    /* Estilo para la tarjeta de ganancia */
-    .ganancia-card { 
-        background-color: #1e2129; 
-        padding: 20px; 
-        border-radius: 10px; 
-        border-left: 5px solid #2ecc71; 
-    }
+    div[data-testid="stNumberInput"] div { margin: 0px auto !important; padding: 0px !important; max-width: 140px !important; }
+    div[data-testid="stNumberInput"] input { text-align: left !important; padding-left: 10px !important; }
+    [data-testid="stMarkdown"] p { font-size: 13px !important; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px !important; }
+    .ganancia-card { background-color: #1e2129; padding: 20px; border-radius: 10px; border-left: 5px solid #2ecc71; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -63,17 +55,14 @@ tab_bebidas, tab_comida, tab_otros, tab_arqueo, tab_ganancia = st.tabs([
 ventas_esperadas = 0.0
 costos_totales = 0.0
 
-# --- PESTAÑA BEBIDAS (ALINEADA) ---
+# --- PESTAÑA BEBIDAS ---
 with tab_bebidas:
     st.subheader("Selección de Bebidas")
     busqueda = st.text_input("🔍 Filtrar bebida...", key="search_input").lower()
     lista_completa = list(st.session_state.menu["🍺 Bebidas"].items())
     lista_filtrada = [p for p in lista_completa if busqueda in p[0].lower()]
-    
     for p, v in lista_filtrada:
-        # Aquí el CSS hace que el número se pegue a la izquierda
         st.number_input(f"{p}", min_value=0, step=1, key=f"bebida_{p}")
-
     for p, v in lista_completa:
         cant = st.session_state.get(f"bebida_{p}", 0)
         ventas_esperadas += (cant * v[0])
@@ -120,14 +109,53 @@ with tab_arqueo:
     if st.button("💾 GUARDAR CIERRE EN EXCEL", use_container_width=True):
         fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
         ganancia_dia = ventas_reales - costos_totales
+        # Guardamos en el orden: Fecha, Venta, Ganancia, Diferencia
         hoja_cierre.append_row([fecha, ventas_reales, ganancia_dia, dif])
         st.success("✅ Cierre guardado correctamente.")
 
-# --- PESTAÑA GANANCIAS ---
+# --- PESTAÑA GANANCIAS CON GRÁFICA MENSUAL ---
 with tab_ganancia:
-    st.header("📊 Análisis de Ganancia")
-    ganancia_neta = ventas_esperadas - costos_totales
-    st.markdown(f"""<div class='ganancia-card'><h3>Utilidad Estimada</h3><h1 style='color: #2ecc71;'>₡{ganancia_neta:,}</h1></div>""", unsafe_allow_html=True)
+    st.header("📊 Análisis de Ganancias")
+    
+    # Ganancia del momento (basada en lo que está marcado arriba)
+    ganancia_ahora = ventas_esperadas - costos_totales
+    st.markdown(f"""
+    <div class='ganancia-card'>
+        <h3>Ganancia Proyectada del Cierre Actual</h3>
+        <h1 style='color: #2ecc71;'>₡{ganancia_ahora:,}</h1>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.divider()
+    st.subheader("Comparativa por Mes")
+    
+    # Cargar datos históricos del Excel para la gráfica
+    try:
+        registros = hoja_cierre.get_all_records()
+        if registros:
+            df = pd.DataFrame(registros)
+            
+            # Asegurar que los nombres de columnas coincidan con tu Excel
+            # (Ajustar si tus columnas se llaman distinto)
+            col_fecha = df.columns[0]   # Fecha
+            col_ganancia = df.columns[2] # Ganancia
+            
+            # Convertir fecha a formato real y agrupar por mes
+            df[col_fecha] = pd.to_datetime(df[col_fecha], dayfirst=True)
+            df['Mes'] = df[col_fecha].dt.strftime('%Y-%m') # Ejemplo: 2024-05
+            
+            # Sumar ganancias por mes
+            resumen_mensual = df.groupby('Mes')[col_ganancia].sum().reset_index()
+            
+            # Mostrar gráfica
+            st.bar_chart(data=resumen_mensual, x='Mes', y=col_ganancia, color="#2ecc71")
+            
+            # Tabla de datos para ver los números exactos
+            st.dataframe(resumen_mensual, use_container_width=True)
+        else:
+            st.info("Aún no hay datos guardados para mostrar la gráfica.")
+    except Exception as e:
+        st.error(f"No se pudo cargar la gráfica: {e}")
 
 # --- SIDEBAR (GESTIÓN) ---
 st.sidebar.header("🧹 Acciones")
@@ -160,4 +188,3 @@ if st.sidebar.checkbox("⚙️ Gestionar Menú"):
                 hoja_prod.delete_rows(celda.row)
                 del st.session_state.menu
                 st.rerun()
-
