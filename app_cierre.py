@@ -7,21 +7,24 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# CSS (Diseño compacto y colores de diferencia)
+# CSS - Restaurado para que la lista se vea limpia como al principio
 st.markdown("""
     <style>
-    @media (max-width: 640px) {
-        div[data-testid="column"] { padding: 0px 1px !important; margin: 0px !important; }
-        div[data-testid="stHorizontalBlock"] { gap: 0px !important; }
+    div[data-testid="stNumberInput"] {
+        max-width: 100% !important;
     }
-    div[data-testid="stNumberInput"] div { margin: 0px auto !important; padding: 0px !important; max-width: 140px !important; }
-    div[data-testid="stNumberInput"] input { text-align: left !important; padding-left: 10px !important; }
-    [data-testid="stMarkdown"] p { font-size: 13px !important; white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px !important; }
-    
-    /* Estilos para los números finales */
-    .resumen-footer { font-size: 16px; font-weight: bold; padding: 10px; border-radius: 5px; background-color: #1e2129; text-align: center; }
+    .resumen-footer { 
+        font-size: 18px; 
+        font-weight: bold; 
+        padding: 15px; 
+        border-radius: 8px; 
+        background-color: #1e2129; 
+        text-align: center; 
+        margin: 10px 0px;
+    }
     .dif-negativa { color: #ff4b4b; }
     .dif-positiva { color: #2ecc71; }
+    .ganancia-card { background-color: #1e2129; padding: 20px; border-radius: 10px; border-left: 5px solid #2ecc71; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -59,18 +62,18 @@ tab_bebidas, tab_comida, tab_otros, tab_arqueo, tab_ganancia = st.tabs([
 ventas_esperadas = 0.0
 costos_totales = 0.0
 
-# --- PESTAÑA BEBIDAS ---
+# --- PESTAÑA BEBIDAS (DISEÑO ORIGINAL) ---
 with tab_bebidas:
     st.subheader("Selección de Bebidas")
     busqueda = st.text_input("🔍 Filtrar bebida...", key="search_input").lower()
     lista_completa = list(st.session_state.menu["🍺 Bebidas"].items())
-    lista_filtrada = [p for p in lista_completa if busqueda in p[0].lower()]
-    for p, v in lista_filtrada:
-        st.number_input(f"{p}", min_value=0, step=1, key=f"bebida_{p}")
+    
     for p, v in lista_completa:
-        cant = st.session_state.get(f"bebida_{p}", 0)
-        ventas_esperadas += (cant * v[0])
-        costos_totales += (cant * v[1])
+        if busqueda in p.lower():
+            st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"bebida_{p}")
+            cant = st.session_state.get(f"bebida_{p}", 0)
+            ventas_esperadas += (cant * v[0])
+            costos_totales += (cant * v[1])
 
 # --- PESTAÑA COMIDAS ---
 with tab_comida:
@@ -80,13 +83,12 @@ with tab_comida:
 
 # --- PESTAÑA OTROS ---
 with tab_otros:
-    lista_o = list(st.session_state.menu["📦 Otros"].items())
-    for p, v in lista_o:
+    for p, v in st.session_state.menu["📦 Otros"].items():
         cant = st.number_input(f"{p} (₡{v[0]:,})", min_value=0, key=f"otro_{p}")
         ventas_esperadas += (cant * v[0])
         costos_totales += (cant * v[1])
 
-# --- PESTAÑA ARQUEO (CON LÍNEA DE DIFERENCIA) ---
+# --- PESTAÑA ARQUEO ---
 with tab_arqueo:
     st.header("🧮 Arqueo de Caja")
     col_b, col_m = st.columns(2)
@@ -108,31 +110,41 @@ with tab_arqueo:
     ventas_reales = total_reportado - fondo
     dif = ventas_reales - ventas_esperadas
 
-    # --- AQUÍ ESTÁ LA NUEVA LÍNEA CON LA DIFERENCIA ---
+    # LÍNEA DE RESUMEN CON DIFERENCIA
     color_dif = "dif-positiva" if dif >= 0 else "dif-negativa"
-    signo = "+" if dif > 0 else ""
-    
     st.markdown(f"""
     <div class="resumen-footer">
-        Neta: ₡{ventas_reales:,} | Esperada: ₡{ventas_esperadas:,} | 
-        <span class="{color_dif}">Dif: ₡{signo}{dif:,}</span>
+        Neta: ₡{ventas_reales:,.0f} | Esperada: ₡{ventas_esperadas:,.0f} | 
+        <span class="{color_dif}">Dif: ₡{dif:,.0f}</span>
     </div>
     """, unsafe_allow_html=True)
     
-    st.divider()
     if st.button("💾 GUARDAR CIERRE EN EXCEL", use_container_width=True):
         fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
         ganancia_dia = ventas_reales - costos_totales
         hoja_cierre.append_row([fecha, ventas_reales, ganancia_dia, dif])
         st.success("✅ Cierre guardado correctamente.")
 
-# --- PESTAÑA GANANCIAS ---
+# --- PESTAÑA GANANCIA (RESTAURADA CON GRÁFICA) ---
 with tab_ganancia:
-    st.header("📊 Análisis")
-    ganancia_neta = ventas_esperadas - costos_totales
-    st.markdown(f"<div class='ganancia-card'><h3>Ganancia Proyectada</h3><h1 style='color: #2ecc71;'>₡{ganancia_neta:,}</h1></div>", unsafe_allow_html=True)
+    st.header("📊 Análisis Mensual")
+    ganancia_ahora = ventas_esperadas - costos_totales
+    st.markdown(f"<div class='ganancia-card'><h3>Ganancia de Hoy</h3><h1 style='color: #2ecc71;'>₡{ganancia_ahora:,.0f}</h1></div>", unsafe_allow_html=True)
+    
+    st.divider()
+    try:
+        df = pd.DataFrame(hoja_cierre.get_all_records())
+        if not df.empty:
+            df['Fecha'] = pd.to_datetime(df[df.columns[0]], dayfirst=True)
+            df['Mes'] = df['Fecha'].dt.strftime('%Y-%m')
+            # Usamos la columna 2 que es donde guardamos la ganancia
+            col_ganancia = df.columns[2]
+            resumen = df.groupby('Mes')[col_ganancia].sum().reset_index()
+            st.bar_chart(data=resumen, x='Mes', y=col_ganancia, color="#2ecc71")
+    except:
+        st.info("Aún no hay suficientes cierres para mostrar la comparativa.")
 
-# --- SIDEBAR ---
+# --- SIDEBAR (Sigue igual) ---
 st.sidebar.header("🧹 Acciones")
 if st.sidebar.button("LIMPIAR CIERRE"):
     for key in list(st.session_state.keys()):
@@ -141,14 +153,14 @@ if st.sidebar.button("LIMPIAR CIERRE"):
     st.rerun()
 
 if st.sidebar.checkbox("⚙️ Gestionar Menú"):
-    st.sidebar.subheader("Añadir Producto")
+    st.sidebar.subheader("Añadir")
     cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"])
     nom_add = st.sidebar.text_input("Nombre", key=f"n_{st.session_state.reset_key}")
     pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"p_{st.session_state.reset_key}")
     cos_add = st.sidebar.number_input("Costo", min_value=0, key=f"c_{st.session_state.reset_key}")
     if st.sidebar.button("➕ Guardar"):
-        if nom_add:
-            hoja_prod.append_row([cat_add, nom_add, pre_add, cos_add])
-            st.session_state.reset_key += 1
-            del st.session_state.menu
-            st.rerun()
+        hoja_prod.append_row([cat_add, nom_add, pre_add, cos_add])
+        st.session_state.reset_key += 1
+        del st.session_state.menu
+        st.rerun()
+
