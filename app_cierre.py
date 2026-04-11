@@ -17,6 +17,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# 1. CONEXIÓN
 def conectar_google():
     try:
         info_llave = st.secrets["gcp_service_account"]
@@ -27,6 +28,7 @@ def conectar_google():
 
 doc = conectar_google()
 
+# 2. CARGA DE DATOS
 if doc:
     hoja_prod = doc.worksheet("Productos")
     hoja_cierre = doc.worksheet("Cierres")
@@ -41,6 +43,7 @@ if doc:
 
 if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
 
+# 3. PESTAÑAS
 tab_bebidas, tab_comida, tab_otros, tab_arqueo, tab_ganancia = st.tabs(["🍺 Bebidas", "🍳 Comidas", "📦 Otros", "📉 ARQUEO", "💰 GANANCIA"])
 
 v_esp = 0.0
@@ -68,6 +71,7 @@ with tab_otros:
         c_tot += (cant * v[1])
 
 with tab_arqueo:
+    st.header("🧮 Arqueo")
     col_b, col_m = st.columns(2)
     t_efec = 0
     with col_b:
@@ -92,24 +96,50 @@ with tab_arqueo:
     if st.button("💾 GUARDAR", use_container_width=True):
         gan = v_esp - c_tot
         hoja_cierre.append_row([datetime.now().strftime("%d/%m/%Y %H:%M"), v_esp, v_net, dif, gan])
-        st.success("✅ Guardado")
+        st.success("✅ ¡Guardado!")
 
 with tab_ganancia:
     st.header("📊 Ganancias")
     gan_h = v_esp - c_tot
     st.markdown(f"<div class='ganancia-card'><h3>Ganancia de Hoy</h3><h1 style='color: #2ecc71;'>₡{gan_h:,.0f}</h1></div>", unsafe_allow_html=True)
     
-    # Lógica de gráfica simplificada para evitar el error del millón
     try:
         df = pd.DataFrame(hoja_cierre.get_all_records())
         if not df.empty and 'Ganancia' in df.columns:
-            # Filtramos solo valores que tengan sentido para limpiar el millón negativo de la vista
-            df = df[df['Ganancia'] > -500000] 
             df['FechaDT'] = pd.to_datetime(df.iloc[:, 0], dayfirst=True)
             df['Mes'] = df['FechaDT'].dt.strftime('%Y-%m')
             resumen = df.groupby('Mes')['Ganancia'].sum().reset_index()
             st.bar_chart(data=resumen, x='Mes', y='Ganancia', color="#2ecc71")
     except:
-        st.info("La gráfica se ajustará con los nuevos cierres.")
+        st.info("La gráfica aparecerá con datos limpios.")
 
-st.sidebar.button("LIMPIAR", on_click=lambda: st.session_state.update({"reset_key": st.session_state.reset_key + 1}))
+# 4. SIDEBAR - RESTAURADO TOTALMENTE
+st.sidebar.header("🧹 Acciones")
+if st.sidebar.button("LIMPIAR CIERRE"):
+    st.session_state.reset_key += 1
+    st.rerun()
+
+if st.sidebar.checkbox("⚙️ Configurar Menú"):
+    st.sidebar.subheader("Añadir")
+    c_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="scat")
+    n_add = st.sidebar.text_input("Nombre", key=f"nprod_{st.session_state.reset_key}")
+    p_add = st.sidebar.number_input("Precio", min_value=0, key=f"pprod_{st.session_state.reset_key}")
+    co_add = st.sidebar.number_input("Costo", min_value=0, key=f"cprod_{st.session_state.reset_key}")
+    if st.sidebar.button("➕ Guardar"):
+        if n_add:
+            hoja_prod.append_row([c_add, n_add, p_add, co_add])
+            if 'menu' in st.session_state: del st.session_state.menu
+            st.rerun()
+    
+    st.sidebar.divider()
+    st.sidebar.subheader("Eliminar")
+    c_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="dcat")
+    if 'menu' in st.session_state:
+        prods = list(st.session_state.menu[c_del].keys())
+        if prods:
+            p_del = st.sidebar.selectbox("Producto", prods, key="pdel_select")
+            if st.sidebar.button("🗑️ Borrar"):
+                celda = hoja_prod.find(p_del)
+                hoja_prod.delete_rows(celda.row)
+                if 'menu' in st.session_state: del st.session_state.menu
+                st.rerun()
