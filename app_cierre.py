@@ -12,7 +12,7 @@ st.markdown("""
     <style>
     /* Ajuste para que el cuadro sea compacto pero muestre los botones +/- */
     div[data-testid="stNumberInput"] {
-        width: 180px !important;
+        width: 150px !important;
     }
     /* Estilo del resumen de arqueo con colores */
     .resumen-footer { 
