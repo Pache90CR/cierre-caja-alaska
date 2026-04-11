@@ -7,14 +7,14 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# CSS - COMPACTO PERO CON BOTONES VISIBLES
+# CSS - COMPACTO, BOTONES VISIBLES Y DISEÑO LIMPIO
 st.markdown("""
     <style>
-    /* Ajuste para que el cuadro sea compacto pero muestre los botones +/- */
+    /* Cuadro compacto pero con espacio para botones +/- */
     div[data-testid="stNumberInput"] {
         width: 150px !important;
     }
-    /* Estilo del resumen de arqueo */
+    /* Estilo del resumen de arqueo con colores */
     .resumen-footer { 
         font-size: 16px; font-weight: bold; padding: 12px; 
         border-radius: 8px; background-color: #1e2129; 
@@ -37,7 +37,7 @@ def conectar_google():
 
 doc = conectar_google()
 
-# --- 2. DATOS ---
+# --- 2. CARGA DE DATOS ---
 if doc:
     hoja_prod = doc.worksheet("Productos")
     hoja_cierre = doc.worksheet("Cierres")
@@ -72,14 +72,17 @@ with tab_bebidas:
 
 # --- COMIDAS ---
 with tab_comida:
-    monto_comida = st.number_input("Total Comandas Cocina (₡)", min_value=0, step=500, key="monto_total_comida")
-    ventas_esperadas += monto_comida
-    costos_totales += (monto_comida * 0.6)
+    st.subheader("Ventas de Cocina")
+    # Se agregó step=1 y formato para evitar errores de API
+    st.number_input("Monto Total Comandas (₡)", min_value=0, step=1, key="monto_total_comida")
+    monto_c = st.session_state.get("monto_total_comida", 0)
+    ventas_esperadas += monto_c
+    costos_totales += (monto_c * 0.6)
 
 # --- OTROS ---
 with tab_otros:
     for p, v in st.session_state.menu["📦 Otros"].items():
-        st.number_input(f"{p} (₡{v[0]:,})", min_value=0, key=f"otro_{p}")
+        st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"otro_{p}")
         ventas_esperadas += (st.session_state.get(f"otro_{p}", 0) * v[0])
         costos_totales += (st.session_state.get(f"otro_{p}", 0) * v[1])
 
@@ -87,83 +90,84 @@ with tab_otros:
 with tab_arqueo:
     st.header("🧮 Arqueo")
     col_b, col_m = st.columns(2)
-    total_efectivo = 0
+    t_efectivo = 0
     with col_b:
         for b in [20000, 10000, 5000, 2000, 1000]:
-            total_efectivo += st.number_input(f"₡{b:,}", min_value=0, key=f"billete_{b}") * b
+            t_efectivo += st.number_input(f"₡{b:,}", min_value=0, step=1, key=f"billete_{b}") * b
     with col_m:
         for m in [500, 100, 50, 25, 10, 5]:
-            total_efectivo += st.number_input(f"₡{m}", min_value=0, key=f"moneda_{m}") * m
+            t_efectivo += st.number_input(f"₡{m}", min_value=0, step=1, key=f"moneda_{m}") * m
 
     st.divider()
-    sinpe = st.number_input("Total SINPE", min_value=0, key="pago_sinpe")
-    tarjetas = st.number_input("Total Tarjetas", min_value=0, key="pago_tarjeta")
-    pendientes = st.number_input("Pendientes", min_value=0, key="pago_pendientes")
-    fondo = st.number_input("Fondo Inicial", min_value=0, key="caja_fondo")
+    sinpe = st.number_input("Total SINPE", min_value=0, step=1, key="pago_sinpe")
+    tarjetas = st.number_input("Total Tarjetas", min_value=0, step=1, key="pago_tarjeta")
+    pendientes = st.number_input("Pendientes (Fiados)", min_value=0, step=1, key="pago_pendientes")
+    fondo = st.number_input("Fondo Inicial", min_value=0, step=1, key="caja_fondo")
 
-    total_reportado = total_efectivo + sinpe + tarjetas + pendientes
-    ventas_reales = total_reportado - fondo
-    dif = ventas_reales - ventas_esperadas
+    v_reales = (t_efectivo + sinpe + tarjetas + pendientes) - fondo
+    dif = v_reales - ventas_esperadas
 
     color_dif = "dif-positiva" if dif >= 0 else "dif-negativa"
-    st.markdown(f"""<div class="resumen-footer">Neta: ₡{ventas_reales:,.0f} | Esperada: ₡{ventas_esperadas:,.0f} | <span class="{color_dif}">Dif: ₡{dif:,.0f}</span></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div class="resumen-footer">Neta: ₡{v_reales:,.0f} | Esperada: ₡{ventas_esperadas:,.0f} | <span class="{color_dif}">Dif: ₡{dif:,.0f}</span></div>""", unsafe_allow_html=True)
     
     if st.button("💾 GUARDAR CIERRE", use_container_width=True):
         fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
-        ganancia_dia = ventas_reales - costos_totales
-        hoja_cierre.append_row([fecha, ventas_reales, ganancia_dia, dif])
-        st.success("✅ ¡Guardado!")
+        ganancia_dia = v_reales - costos_totales
+        hoja_cierre.append_row([fecha, v_reales, ganancia_dia, dif])
+        st.success("✅ ¡Guardado en Excel!")
 
 # --- GANANCIA ---
 with tab_ganancia:
     st.header("📊 Análisis")
     ganancia_ahora = ventas_esperadas - costos_totales
-    st.markdown(f"<div class='ganancia-card'><h3>Ganancia de Hoy</h3><h1 style='color: #2ecc71;'>₡{ganancia_ahora:,.0f}</h1></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='ganancia-card'><h3>Utilidad de Hoy</h3><h1 style='color: #2ecc71;'>₡{ganancia_ahora:,.0f}</h1></div>", unsafe_allow_html=True)
     
     try:
         registros = hoja_cierre.get_all_records()
         if registros:
             df = pd.DataFrame(registros)
-            # Forzamos que la primera columna sea fecha y la tercera ganancia
             df['FechaDT'] = pd.to_datetime(df.iloc[:, 0], dayfirst=True)
             df['Mes'] = df['FechaDT'].dt.strftime('%Y-%m')
-            resumen = df.groupby('Mes').iloc[:, 2].sum().reset_index()
+            # Sumar la columna de ganancia (columna index 2)
+            resumen = df.groupby('Mes').agg({df.columns[2]: 'sum'}).reset_index()
             st.bar_chart(data=resumen, x='Mes', y=resumen.columns[1], color="#2ecc71")
     except:
         st.info("Gráfica disponible tras guardar cierres.")
 
-# --- SIDEBAR (RESTAURADO ELIMINAR) ---
+# --- SIDEBAR (GESTIÓN) ---
 st.sidebar.header("🧹 Acciones")
 if st.sidebar.button("LIMPIAR CIERRE"):
+    # Nueva lógica de limpieza segura para evitar el error rojo
     for key in list(st.session_state.keys()):
-        if key.startswith(('bebida_', 'otro_', 'billete_', 'moneda_', 'pago_', 'monto_total_comida')):
+        if any(x in key for x in ['bebida_', 'otro_', 'billete_', 'moneda_', 'pago_', 'monto_total_comida']):
             st.session_state[key] = 0
     st.rerun()
 
 if st.sidebar.checkbox("⚙️ Configurar Menú"):
     st.sidebar.subheader("Añadir")
-    cat_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="s_cat")
-    nom_add = st.sidebar.text_input("Nombre", key=f"n_{st.session_state.reset_key}")
-    pre_add = st.sidebar.number_input("Precio", min_value=0, key=f"p_{st.session_state.reset_key}")
-    cos_add = st.sidebar.number_input("Costo", min_value=0, key=f"c_{st.session_state.reset_key}")
+    c_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="s_cat")
+    n_add = st.sidebar.text_input("Nombre", key=f"n_{st.session_state.reset_key}")
+    p_add = st.sidebar.number_input("Precio", min_value=0, key=f"p_{st.session_state.reset_key}")
+    co_add = st.sidebar.number_input("Costo", min_value=0, key=f"c_{st.session_state.reset_key}")
     if st.sidebar.button("➕ Guardar"):
-        hoja_prod.append_row([cat_add, nom_add, pre_add, cos_add])
+        hoja_prod.append_row([c_add, n_add, p_add, co_add])
         st.session_state.reset_key += 1
-        del st.session_state.menu
+        if 'menu' in st.session_state: del st.session_state.menu
         st.rerun()
     
     st.sidebar.divider()
     st.sidebar.subheader("Eliminar")
-    cat_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="d_cat")
+    c_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="d_cat")
     if 'menu' in st.session_state:
-        prods = list(st.session_state.menu[cat_del].keys())
+        prods = list(st.session_state.menu[c_del].keys())
         if prods:
-            prod_del = st.sidebar.selectbox("Producto", prods)
+            p_del = st.sidebar.selectbox("Producto", prods)
             if st.sidebar.button("🗑️ Borrar"):
-                celda = hoja_prod.find(prod_del)
+                celda = hoja_prod.find(p_del)
                 hoja_prod.delete_rows(celda.row)
                 del st.session_state.menu
                 st.rerun()
+
 
 
 
