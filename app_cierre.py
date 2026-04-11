@@ -7,14 +7,10 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# CSS - DISEÑO COMPACTO Y LIMPIO
+# CSS - DISEÑO COMPACTO, BOTONES +/- VISIBLES Y RESUMEN DE COLORES
 st.markdown("""
     <style>
-    /* Cuadro compacto pero con botones +/- funcionales */
-    div[data-testid="stNumberInput"] {
-        width: 180px !important;
-    }
-    /* Resumen de arqueo con colores de alerta */
+    div[data-testid="stNumberInput"] { width: 180px !important; }
     .resumen-footer { 
         font-size: 16px; font-weight: bold; padding: 12px; 
         border-radius: 8px; background-color: #1e2129; 
@@ -50,9 +46,7 @@ if doc:
             menu_temp[fila['Categoria']][fila['Producto']] = [float(precio), float(costo)]
         st.session_state.menu = menu_temp
 
-# Llave de reset para evitar el error de Duplicate ID
-if 'reset_key' not in st.session_state:
-    st.session_state.reset_key = 0
+if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
 
 # --- 3. PESTAÑAS ---
 tab_bebidas, tab_comida, tab_otros, tab_arqueo, tab_ganancia = st.tabs([
@@ -65,7 +59,7 @@ costos_totales = 0.0
 # --- BEBIDAS ---
 with tab_bebidas:
     st.subheader("Selección de Bebidas")
-    busqueda = st.text_input("🔍 Filtrar bebida...", key=f"bus_{st.session_state.reset_key}").lower()
+    busqueda = st.text_input("🔍 Filtrar...", key=f"bus_{st.session_state.reset_key}").lower()
     for p, v in st.session_state.menu["🍺 Bebidas"].items():
         if busqueda in p.lower():
             st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"b_{p}_{st.session_state.reset_key}")
@@ -113,36 +107,37 @@ with tab_arqueo:
     st.markdown(f"""<div class="resumen-footer">Neta: ₡{v_reales:,.0f} | Esperada: ₡{ventas_esperadas:,.0f} | <span class="{color_dif}">Dif: ₡{dif:,.0f}</span></div>""", unsafe_allow_html=True)
     
     if st.button("💾 GUARDAR CIERRE", use_container_width=True):
-        fecha = datetime.now().strftime("%d/%m/%Y %H:%M")
-        ganancia_dia = v_reales - costos_totales
-        hoja_cierre.append_row([fecha, v_reales, ganancia_dia, dif])
-        st.success("✅ ¡Guardado!")
+        fecha_hoy = datetime.now().strftime("%d/%m/%Y %H:%M")
+        ganancia_dia = ventas_esperadas - costos_totales
+        # ORDEN: Fecha, Esperada, Neta, Diferencia, Ganancia
+        hoja_cierre.append_row([fecha_hoy, ventas_esperadas, v_reales, dif, ganancia_dia])
+        st.success("✅ ¡Cierre guardado en el nuevo orden!")
 
-# --- GANANCIA ---
+# --- GANANCIA (GRÁFICA SEGURA) ---
 with tab_ganancia:
     st.header("📊 Análisis")
-    ganancia_ahora = ventas_esperadas - costos_totales
-    st.markdown(f"<div class='ganancia-card'><h3>Utilidad Estimada</h3><h1 style='color: #2ecc71;'>₡{ganancia_ahora:,.0f}</h1></div>", unsafe_allow_html=True)
+    ganancia_hoy = ventas_esperadas - costos_totales
+    st.markdown(f"<div class='ganancia-card'><h3>Ganancia de Hoy (Proyectada)</h3><h1 style='color: #2ecc71;'>₡{ganancia_hoy:,.0f}</h1></div>", unsafe_allow_html=True)
     
     try:
-        registros = hoja_cierre.get_all_records()
-        if registros:
-            df = pd.DataFrame(registros)
+        df = pd.DataFrame(hoja_cierre.get_all_records())
+        if not df.empty and 'Ganancia' in df.columns:
             df['FechaDT'] = pd.to_datetime(df.iloc[:, 0], dayfirst=True)
             df['Mes'] = df['FechaDT'].dt.strftime('%Y-%m')
-            resumen = df.groupby('Mes').agg({df.columns[2]: 'sum'}).reset_index()
-            st.bar_chart(data=resumen, x='Mes', y=resumen.columns[1], color="#2ecc71")
+            resumen = df.groupby('Mes')['Ganancia'].sum().reset_index()
+            st.bar_chart(data=resumen, x='Mes', y='Ganancia', color="#2ecc71")
+        else:
+            st.info("La gráfica aparecerá cuando guardes cierres con la columna 'Ganancia'.")
     except:
-        st.info("Gráfica disponible tras guardar cierres.")
+        st.error("Error al cargar la gráfica. Revisa los encabezados de tu Excel.")
 
-# --- SIDEBAR (SISTEMA SEGURO) ---
+# --- SIDEBAR ---
 st.sidebar.header("🧹 Acciones")
 if st.sidebar.button("LIMPIAR CIERRE"):
-    st.session_state.reset_key += 1 # Esto cambia todos los IDs y evita el error rojo
+    st.session_state.reset_key += 1
     st.rerun()
 
 if st.sidebar.checkbox("⚙️ Configurar Menú"):
-    st.sidebar.subheader("Añadir")
     c_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="scat")
     n_add = st.sidebar.text_input("Nombre", key=f"nprod_{st.session_state.reset_key}")
     p_add = st.sidebar.number_input("Precio", min_value=0, key=f"pprod_{st.session_state.reset_key}")
@@ -152,11 +147,9 @@ if st.sidebar.checkbox("⚙️ Configurar Menú"):
             hoja_prod.append_row([c_add, n_add, p_add, co_add])
             if 'menu' in st.session_state: del st.session_state.menu
             st.rerun()
-    
     st.sidebar.divider()
-    st.sidebar.subheader("Eliminar")
-    c_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="dcat")
     if 'menu' in st.session_state:
+        c_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="dcat")
         prods = list(st.session_state.menu[c_del].keys())
         if prods:
             p_del = st.sidebar.selectbox("Producto", prods, key="pdel_select")
@@ -165,9 +158,3 @@ if st.sidebar.checkbox("⚙️ Configurar Menú"):
                 hoja_prod.delete_rows(celda.row)
                 del st.session_state.menu
                 st.rerun()
-
-
-
-
-
-
