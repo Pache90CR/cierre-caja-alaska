@@ -7,14 +7,14 @@ from datetime import datetime
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Cierre Alaska", layout="centered")
 
-# CSS - DISEÑO COMPACTO CON BOTONES VISIBLES (COMO TE GUSTA)
+# CSS - DISEÑO COMPACTO Y LIMPIO
 st.markdown("""
     <style>
-    /* Ajuste para que el cuadro sea compacto pero muestre los botones +/- */
+    /* Cuadro compacto pero con botones +/- funcionales */
     div[data-testid="stNumberInput"] {
-        width: 150px !important;
+        width: 180px !important;
     }
-    /* Estilo del resumen de arqueo con colores */
+    /* Resumen de arqueo con colores de alerta */
     .resumen-footer { 
         font-size: 16px; font-weight: bold; padding: 12px; 
         border-radius: 8px; background-color: #1e2129; 
@@ -50,7 +50,7 @@ if doc:
             menu_temp[fila['Categoria']][fila['Producto']] = [float(precio), float(costo)]
         st.session_state.menu = menu_temp
 
-# Inicializar reset_key para limpieza segura
+# Llave de reset para evitar el error de Duplicate ID
 if 'reset_key' not in st.session_state:
     st.session_state.reset_key = 0
 
@@ -65,28 +65,26 @@ costos_totales = 0.0
 # --- BEBIDAS ---
 with tab_bebidas:
     st.subheader("Selección de Bebidas")
-    busqueda = st.text_input("🔍 Filtrar...", key=f"search_{st.session_state.reset_key}").lower()
+    busqueda = st.text_input("🔍 Filtrar bebida...", key=f"bus_{st.session_state.reset_key}").lower()
     for p, v in st.session_state.menu["🍺 Bebidas"].items():
         if busqueda in p.lower():
-            # Usamos el reset_key en la llave para que se limpie de verdad sin errores
-            st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"bebida_{p}_{st.session_state.reset_key}")
-            cant = st.session_state.get(f"bebida_{p}_{st.session_state.reset_key}", 0)
+            st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"b_{p}_{st.session_state.reset_key}")
+            cant = st.session_state.get(f"b_{p}_{st.session_state.reset_key}", 0)
             ventas_esperadas += (cant * v[0])
             costos_totales += (cant * v[1])
 
 # --- COMIDAS ---
 with tab_comida:
-    st.subheader("Ventas de Cocina")
-    st.number_input("Monto Total Comandas (₡)", min_value=0, step=1, key=f"monto_total_comida_{st.session_state.reset_key}")
-    monto_c = st.session_state.get(f"monto_total_comida_{st.session_state.reset_key}", 0)
+    st.number_input("Monto Total Comandas (₡)", min_value=0, step=1, key=f"comida_{st.session_state.reset_key}")
+    monto_c = st.session_state.get(f"comida_{st.session_state.reset_key}", 0)
     ventas_esperadas += monto_c
     costos_totales += (monto_c * 0.6)
 
 # --- OTROS ---
 with tab_otros:
     for p, v in st.session_state.menu["📦 Otros"].items():
-        st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"otro_{p}_{st.session_state.reset_key}")
-        cant = st.session_state.get(f"otro_{p}_{st.session_state.reset_key}", 0)
+        st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"o_{p}_{st.session_state.reset_key}")
+        cant = st.session_state.get(f"o_{p}_{st.session_state.reset_key}", 0)
         ventas_esperadas += (cant * v[0])
         costos_totales += (cant * v[1])
 
@@ -97,16 +95,16 @@ with tab_arqueo:
     t_efectivo = 0
     with col_b:
         for b in [20000, 10000, 5000, 2000, 1000]:
-            t_efectivo += st.number_input(f"₡{b:,}", min_value=0, step=1, key=f"billete_{b}_{st.session_state.reset_key}") * b
+            t_efectivo += st.number_input(f"₡{b:,}", min_value=0, step=1, key=f"bil_{b}_{st.session_state.reset_key}") * b
     with col_m:
         for m in [500, 100, 50, 25, 10, 5]:
-            t_efectivo += st.number_input(f"₡{m}", min_value=0, step=1, key=f"moneda_{m}_{st.session_state.reset_key}") * m
+            t_efectivo += st.number_input(f"₡{m}", min_value=0, step=1, key=f"mon_{m}_{st.session_state.reset_key}") * m
 
     st.divider()
-    sinpe = st.number_input("Total SINPE", min_value=0, step=1, key=f"pago_sinpe_{st.session_state.reset_key}")
-    tarjetas = st.number_input("Total Tarjetas", min_value=0, step=1, key=f"pago_tarjeta_{st.session_state.reset_key}")
-    pendientes = st.number_input("Pendientes", min_value=0, step=1, key=f"pago_pendientes_{st.session_state.reset_key}")
-    fondo = st.number_input("Fondo Inicial", min_value=0, step=1, key=f"caja_fondo_{st.session_state.reset_key}")
+    sinpe = st.number_input("Total SINPE", min_value=0, step=1, key=f"sinpe_{st.session_state.reset_key}")
+    tarjetas = st.number_input("Total Tarjetas", min_value=0, step=1, key=f"card_{st.session_state.reset_key}")
+    pendientes = st.number_input("Pendientes", min_value=0, step=1, key=f"pend_{st.session_state.reset_key}")
+    fondo = st.number_input("Fondo Inicial", min_value=0, step=1, key=f"fondo_{st.session_state.reset_key}")
 
     v_reales = (t_efectivo + sinpe + tarjetas + pendientes) - fondo
     dif = v_reales - ventas_esperadas
@@ -124,7 +122,7 @@ with tab_arqueo:
 with tab_ganancia:
     st.header("📊 Análisis")
     ganancia_ahora = ventas_esperadas - costos_totales
-    st.markdown(f"<div class='ganancia-card'><h3>Utilidad de Hoy</h3><h1 style='color: #2ecc71;'>₡{ganancia_ahora:,.0f}</h1></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='ganancia-card'><h3>Utilidad Estimada</h3><h1 style='color: #2ecc71;'>₡{ganancia_ahora:,.0f}</h1></div>", unsafe_allow_html=True)
     
     try:
         registros = hoja_cierre.get_all_records()
@@ -137,39 +135,37 @@ with tab_ganancia:
     except:
         st.info("Gráfica disponible tras guardar cierres.")
 
-# --- SIDEBAR (GESTIÓN) ---
+# --- SIDEBAR (SISTEMA SEGURO) ---
 st.sidebar.header("🧹 Acciones")
-# BOTÓN DE LIMPIEZA TOTALMENTE SEGURO
 if st.sidebar.button("LIMPIAR CIERRE"):
-    # En lugar de borrar uno por uno, cambiamos la 'reset_key'
-    # Esto obliga a Streamlit a renderizar widgets nuevos y limpios
-    st.session_state.reset_key += 1
+    st.session_state.reset_key += 1 # Esto cambia todos los IDs y evita el error rojo
     st.rerun()
 
 if st.sidebar.checkbox("⚙️ Configurar Menú"):
     st.sidebar.subheader("Añadir")
-    c_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="s_cat")
-    n_add = st.sidebar.text_input("Nombre", key=f"new_prod_name_{st.session_state.reset_key}")
-    p_add = st.sidebar.number_input("Precio", min_value=0, key=f"new_prod_price_{st.session_state.reset_key}")
-    co_add = st.sidebar.number_input("Costo", min_value=0, key=f"new_prod_cost_{st.session_state.reset_key}")
+    c_add = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"], key="scat")
+    n_add = st.sidebar.text_input("Nombre", key=f"nprod_{st.session_state.reset_key}")
+    p_add = st.sidebar.number_input("Precio", min_value=0, key=f"pprod_{st.session_state.reset_key}")
+    co_add = st.sidebar.number_input("Costo", min_value=0, key=f"cprod_{st.session_state.reset_key}")
     if st.sidebar.button("➕ Guardar"):
         if n_add:
             hoja_prod.append_row([c_add, n_add, p_add, co_add])
-            del st.session_state.menu
+            if 'menu' in st.session_state: del st.session_state.menu
             st.rerun()
     
     st.sidebar.divider()
     st.sidebar.subheader("Eliminar")
-    c_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="d_cat")
+    c_del = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"], key="dcat")
     if 'menu' in st.session_state:
         prods = list(st.session_state.menu[c_del].keys())
         if prods:
-            p_del = st.sidebar.selectbox("Producto", prods)
+            p_del = st.sidebar.selectbox("Producto", prods, key="pdel_select")
             if st.sidebar.button("🗑️ Borrar"):
                 celda = hoja_prod.find(p_del)
                 hoja_prod.delete_rows(celda.row)
                 del st.session_state.menu
                 st.rerun()
+
 
 
 
