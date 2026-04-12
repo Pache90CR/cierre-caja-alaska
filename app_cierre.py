@@ -9,7 +9,7 @@ st.set_page_config(page_title="Alaska - Control Total", layout="centered")
 
 st.markdown("""
     <style>
-    div[data-testid="stNumberInput"] { width: 180px !important; }
+    div[data-testid="stNumberInput"] { width: 100px !important; }
     .resumen-footer { font-size: 16px; font-weight: bold; padding: 12px; border-radius: 8px; background-color: #1e2129; text-align: center; margin-top: 20px; }
     .dif-negativa { color: #ff4b4b; }
     .dif-positiva { color: #2ecc71; }
