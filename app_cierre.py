@@ -84,7 +84,7 @@ with t_arqueo:
         for b in [20000, 10000, 5000, 2000, 1000]:
             efectivo += st.number_input(f"₡{b:,}", min_value=0, key=f"bil_{b}_{st.session_state.reset_key}") * b
     with col2:
-        for m in [500, 100, 50, 25, 10, 5]:
+        for m in [500, 100, 50, ]:
             efectivo += st.number_input(f"₡{m}", min_value=0, key=f"mon_{m}_{st.session_state.reset_key}") * m
 
     st.divider()
