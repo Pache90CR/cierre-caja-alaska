@@ -4,20 +4,23 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 from datetime import datetime
 
-# --- CONFIGURACIÓN VISUAL ---
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Alaska Control", layout="centered")
 
 st.markdown("""
     <style>
-    div[data-testid="stNumberInput"] { width: 180px !important; }
-    .resumen-footer { font-size: 16px; font-weight: bold; padding: 12px; border-radius: 8px; background-color: #1e2129; text-align: center; margin-top: 20px; }
+    div[data-testid="stNumberInput"] { width: 140px !important; }
+    .resumen-footer { 
+        font-size: 16px; font-weight: bold; padding: 12px; 
+        border-radius: 8px; background-color: #1e2129; 
+        text-align: center; margin-top: 20px; 
+    }
     .dif-negativa { color: #ff4b4b; }
     .dif-positiva { color: #2ecc71; }
-    .ganancia-card { background-color: #1e2129; padding: 20px; border-radius: 10px; border-left: 5px solid #2ecc71; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 1. CONEXIÓN A GOOGLE
+# 1. CONEXIÓN
 def conectar():
     try:
         creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], 
@@ -40,11 +43,10 @@ if doc:
 
 if 'reset_key' not in st.session_state: st.session_state.reset_key = 0
 
-# 2. INTERFAZ DE PESTAÑAS
-t1, t2, t3, t4, t5 = st.tabs(["🍺 Bebidas", "🍳 Cocina", "📦 Otros", "📉 ARQUEO", "💰 GANANCIA"])
+# 2. INTERFAZ
+t1, t2, t3, t4 = st.tabs(["🍺 Bebidas", "🍳 Cocina", "📦 Otros", "📉 ARQUEO"])
 
-v_esperada = 0.0
-c_materia_prima = 0.0
+v_esp = 0.0
 
 with t1:
     st.subheader("Bebidas")
@@ -52,102 +54,73 @@ with t1:
     for p, v in st.session_state.menu["🍺 Bebidas"].items():
         if bus in p.lower():
             cant = st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"b_{p}_{st.session_state.reset_key}")
-            v_esperada += (cant * v[0])
-            c_materia_prima += (cant * v[1])
+            v_esp += (cant * v[0])
 
 with t2:
-    st.subheader("Ventas de Cocina")
-    m_cocina = st.number_input("Total Comandas (₡)", min_value=0, step=1, key=f"c_{st.session_state.reset_key}")
-    v_esperada += m_cocina
-    c_materia_prima += (m_cocina * 0.60) # Costo 60%
+    st.subheader("Ventas Cocina")
+    m_c = st.number_input("Total Comandas (₡)", min_value=0, step=1, key=f"c_{st.session_state.reset_key}")
+    v_esp += m_c
 
 with t3:
-    st.subheader("Otros Productos")
+    st.subheader("Otros")
     for p, v in st.session_state.menu["📦 Otros"].items():
         cant = st.number_input(f"{p} (₡{v[0]:,})", min_value=0, step=1, key=f"o_{p}_{st.session_state.reset_key}")
-        v_esperada += (cant * v[0])
-        c_materia_prima += (cant * v[1])
+        v_esp += (cant * v[0])
 
 with t4:
     st.header("Arqueo de Caja")
     c1, c2 = st.columns(2)
-    efectivo_total = 0
+    t_efec = 0
     with c1:
         for b in [20000, 10000, 5000, 2000, 1000]:
-            efectivo_total += st.number_input(f"₡{b:,}", min_value=0, key=f"bil_{b}_{st.session_state.reset_key}") * b
+            t_efec += st.number_input(f"₡{b:,}", min_value=0, key=f"bil_{b}_{st.session_state.reset_key}") * b
     with c2:
-        for m in [500, 100, 50, 25, 10, 5]:
-            efectivo_total += st.number_input(f"₡{m}", min_value=0, key=f"mon_{m}_{st.session_state.reset_key}") * m
+        for m in [500, 100, 50, ]:
+            t_efec += st.number_input(f"₡{m}", min_value=0, key=f"mon_{m}_{st.session_state.reset_key}") * m
 
     st.divider()
-    sinpe = st.number_input("Total SINPE Móvil", min_value=0, key=f"sn_{st.session_state.reset_key}")
-    tarjetas = st.number_input("Total Tarjetas", min_value=0, key=f"tr_{st.session_state.reset_key}")
-    pendientes = st.number_input("Pendientes (Fiados)", min_value=0, key=f"pn_{st.session_state.reset_key}")
-    fondo = st.number_input("Fondo Inicial (Caja)", min_value=0, key=f"fd_{st.session_state.reset_key}")
+    sn = st.number_input("Total SINPE", min_value=0, key=f"sn_{st.session_state.reset_key}")
+    tr = st.number_input("Total Tarjetas", min_value=0, key=f"tr_{st.session_state.reset_key}")
+    pn = st.number_input("Pendientes (Fiados)", min_value=0, key=f"pn_{st.session_state.reset_key}")
+    fd = st.number_input("Fondo Inicial", min_value=0, key=f"fd_{st.session_state.reset_key}")
 
-    venta_neta_real = (efectivo_total + sinpe + tarjetas + pendientes) - fondo
-    diferencia = venta_neta_real - v_esperada
+    v_neta = (t_efec + sn + tr + pn) - fd
+    dif = v_neta - v_esp
 
-    clase_dif = "dif-positiva" if diferencia >= 0 else "dif-negativa"
-    st.markdown(f"""<div class="resumen-footer">Venta Neta: ₡{venta_neta_real:,.0f} | Diferencia: <span class="{clase_dif}">₡{diferencia:,.0f}</span></div>""", unsafe_allow_html=True)
+    color = "dif-positiva" if dif >= 0 else "dif-negativa"
+    st.markdown(f"""<div class="resumen-footer">Venta Neta: ₡{v_neta:,.0f} | Diferencia: <span class="{color}">₡{dif:,.0f}</span></div>""", unsafe_allow_html=True)
     
     if st.button("💾 GUARDAR CIERRE", use_container_width=True):
-        gan_bruta = v_esperada - c_materia_prima
-        h_cier.append_row([datetime.now().strftime("%d/%m/%Y %H:%M"), v_esperada, venta_neta_real, diferencia, gan_bruta])
+        # Guardamos solo datos básicos: Fecha, Esperada, Neta, Diferencia
+        h_cier.append_row([datetime.now().strftime("%d/%m/%Y %H:%M"), v_esp, v_neta, dif])
         st.success("✅ ¡Cierre guardado!")
 
-with t5:
-    st.header("Análisis de Utilidad")
-    # CÁLCULO EN VIVO (Sin mirar el historial para evitar el millón negativo)
-    utilidad_hoy = v_esperada - c_materia_prima
-    
-    st.markdown(f"""
-    <div class='ganancia-card'>
-        <p style='margin:0;'>Ganancia Bruta de lo Vendido (Hoy)</p>
-        <h1 style='color: #2ecc71; margin:0;'>₡{utilidad_hoy:,.0f}</h1>
-        <small>Venta Esperada (₡{v_esperada:,.0f}) - Costo Estimado (₡{c_materia_prima:,.0f})</small>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    try:
-        registros = h_cier.get_all_records()
-        if registros:
-            df = pd.DataFrame(registros)
-            if 'Ganancia' in df.columns:
-                df['FechaDT'] = pd.to_datetime(df.iloc[:, 0], dayfirst=True)
-                df['Mes'] = df['FechaDT'].dt.strftime('%Y-%m')
-                resumen = df.groupby('Mes')['Ganancia'].sum().reset_index()
-                st.subheader("Historial Mensual")
-                st.bar_chart(data=resumen, x='Mes', y='Ganancia', color="#2ecc71")
-        else: st.info("La gráfica aparecerá después del primer guardado.")
-    except: st.error("Error al cargar gráfica.")
-
-# SIDEBAR: GESTIÓN
+# SIDEBAR
 st.sidebar.header("⚙️ Configuración")
 if st.sidebar.button("🧹 LIMPIAR TODO"):
     st.session_state.reset_key += 1
     st.rerun()
 
-if st.sidebar.checkbox("🍔 Editar Inventario"):
-    st.sidebar.subheader("Agregar Producto")
-    c_a = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"])
-    n_a = st.sidebar.text_input("Nombre")
-    p_a = st.sidebar.number_input("Precio Venta", min_value=0)
-    co_a = st.sidebar.number_input("Costo Materia Prima", min_value=0)
+if st.sidebar.checkbox("🍔 Editar Productos"):
+    st.sidebar.subheader("Agregar")
+    ca = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"])
+    na = st.sidebar.text_input("Nombre")
+    pa = st.sidebar.number_input("Precio", min_value=0)
+    co = st.sidebar.number_input("Costo", min_value=0)
     if st.sidebar.button("Añadir"):
-        h_prod.append_row([c_a, n_a, p_a, co_a])
+        h_prod.append_row([ca, na, pa, co])
         if 'menu' in st.session_state: del st.session_state.menu
         st.rerun()
     
     st.sidebar.divider()
-    st.sidebar.subheader("Eliminar Producto")
-    c_d = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"])
+    st.sidebar.subheader("Eliminar")
+    cd = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"])
     if 'menu' in st.session_state:
-        prods = list(st.session_state.menu[c_d].keys())
+        prods = list(st.session_state.menu[cd].keys())
         if prods:
-            p_d = st.sidebar.selectbox("Seleccione", prods)
-            if st.sidebar.button("Eliminar"):
-                celda = h_prod.find(p_d)
-                h_prod.delete_rows(celda.row)
+            pd = st.sidebar.selectbox("Seleccione", prods)
+            if st.sidebar.button("Borrar"):
+                c = h_prod.find(pd)
+                h_prod.delete_rows(c.row)
                 if 'menu' in st.session_state: del st.session_state.menu
                 st.rerun()
