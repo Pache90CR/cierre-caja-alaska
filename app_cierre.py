@@ -62,7 +62,7 @@ with tab_comida:
     st.subheader("Cocina")
     m_c = st.number_input("Total Comandas (₡)", min_value=0, step=1, key=f"c_{st.session_state.reset_key}")
     v_esp += m_c
-    c_tot += (m_c * 0.6) # Costo estimado cocina
+    c_tot += (m_c * 0.6)
 
 with tab_otros:
     st.subheader("Otros")
@@ -73,7 +73,7 @@ with tab_otros:
         c_tot += (cant * v[1])
 
 with tab_arqueo:
-    st.header("Arqueo")
+    st.header("Arqueo de Caja")
     col_b, col_m = st.columns(2)
     t_efec = 0
     with col_b:
@@ -96,40 +96,36 @@ with tab_arqueo:
     st.markdown(f"""<div class="resumen-footer">Venta Neta: ₡{v_net:,.0f} | Diferencia: <span class="{c_dif}">₡{dif:,.0f}</span></div>""", unsafe_allow_html=True)
     
     if st.button("💾 GUARDAR CIERRE", use_container_width=True):
-        gan_bruta = v_esp - c_tot
-        hoja_cierre.append_row([datetime.now().strftime("%d/%m/%Y %H:%M"), v_esp, v_net, dif, gan_bruta])
-        st.success("✅ ¡Cierre Guardado!")
+        gan_b = v_esp - c_tot
+        hoja_cierre.append_row([datetime.now().strftime("%d/%m/%Y %H:%M"), v_esp, v_net, dif, gan_b])
+        st.success("✅ Cierre guardado con éxito.")
 
 with tab_ganancia:
     st.header("💰 Ganancia Bruta")
-    gan_bruta_hoy = v_esp - c_tot
-    st.markdown(f"""
-    <div class='ganancia-card'>
-        <h3>Utilidad de lo Vendido</h3>
-        <h1 style='color: #2ecc71;'>₡{gan_bruta_hoy:,.0f}</h1>
-        <small>Venta Esperada - Costo de Productos</small>
-    </div>
-    """, unsafe_allow_html=True)
+    gan_h = v_esp - c_tot
+    st.markdown(f"""<div class='ganancia-card'><h3>Ganancia de lo Vendido</h3><h1 style='color: #2ecc71;'>₡{gan_h:,.0f}</h1><small>Venta Esperada - Costos</small></div>""", unsafe_allow_html=True)
     
     try:
-        df = pd.DataFrame(hoja_cierre.get_all_records())
-        if not df.empty and 'Ganancia' in df.columns:
-            # Quitamos cualquier valor "basura" muy grande para limpiar la gráfica
-            df = df[(df['Ganancia'] > -100000) & (df['Ganancia'] < 1000000)]
-            df['FechaDT'] = pd.to_datetime(df.iloc[:, 0], dayfirst=True)
-            df['Mes'] = df['FechaDT'].dt.strftime('%Y-%m')
-            resumen = df.groupby('Mes')['Ganancia'].sum().reset_index()
-            st.bar_chart(data=resumen, x='Mes', y='Ganancia', color="#2ecc71")
+        data = hoja_cierre.get_all_records()
+        if data:
+            df = pd.DataFrame(data)
+            if 'Ganancia' in df.columns:
+                df['FechaDT'] = pd.to_datetime(df.iloc[:, 0], dayfirst=True)
+                df['Mes'] = df['FechaDT'].dt.strftime('%Y-%m')
+                resumen = df.groupby('Mes')['Ganancia'].sum().reset_index()
+                st.bar_chart(data=resumen, x='Mes', y='Ganancia', color="#2ecc71")
+        else:
+            st.info("Aún no hay datos para mostrar la gráfica mensual.")
     except:
-        st.info("La gráfica se actualizará con los nuevos cierres.")
+        st.warning("Revisando los datos del historial...")
 
-# SIDEBAR
-st.sidebar.header("⚙️ Gestión")
+# SIDEBAR - CONFIGURACIÓN
+st.sidebar.header("⚙️ Ajustes")
 if st.sidebar.button("🧹 LIMPIAR TODO"):
     st.session_state.reset_key += 1
     st.rerun()
 
-if st.sidebar.checkbox("🍔 Editar Menú"):
+if st.sidebar.checkbox("🍔 Configurar Productos"):
     st.sidebar.subheader("Agregar")
     cat = st.sidebar.selectbox("Categoría", ["🍺 Bebidas", "📦 Otros"])
     nom = st.sidebar.text_input("Nombre")
@@ -137,16 +133,18 @@ if st.sidebar.checkbox("🍔 Editar Menú"):
     cos = st.sidebar.number_input("Costo", min_value=0)
     if st.sidebar.button("Añadir"):
         hoja_prod.append_row([cat, nom, pre, cos])
-        del st.session_state.menu
+        if 'menu' in st.session_state: del st.session_state.menu
         st.rerun()
     
     st.sidebar.divider()
     st.sidebar.subheader("Eliminar")
     cat_d = st.sidebar.selectbox("Categoría ", ["🍺 Bebidas", "📦 Otros"])
     if 'menu' in st.session_state:
-        p_d = st.sidebar.selectbox("Producto", list(st.session_state.menu[cat_d].keys()))
-        if st.sidebar.button("Borrar"):
-            c = hoja_prod.find(p_d)
-            hoja_prod.delete_rows(c.row)
-            del st.session_state.menu
-            st.rerun()
+        p_list = list(st.session_state.menu[cat_d].keys())
+        if p_list:
+            p_d = st.sidebar.selectbox("Producto", p_list)
+            if st.sidebar.button("Borrar"):
+                c = hoja_prod.find(p_d)
+                hoja_prod.delete_rows(c.row)
+                if 'menu' in st.session_state: del st.session_state.menu
+                st.rerun()
